@@ -11,8 +11,8 @@
 
 ---
 
-## 🏛️ Service Architecture
-![Service Architecture Diagram](./system_architecture.png)
+## 🏛️ System Architecture
+![System Architecture Diagram](./system_architecture.png)
 
 ## ⚙️ Infrastructure Constraints & Design Decisions
 
