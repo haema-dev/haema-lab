@@ -17,7 +17,7 @@
 ## ⚙️ Infrastructure Constraints & Design Decisions
 
 **Hardware Topology**: 
-- **Compute Node (A)**: 6-core CPU, 12 threads, 32GB RAM (Kubernetes master + workload)
+- **Compute Node (A)**: 6-core CPU, 12 threads, 32GB RAM (Kubernetes control plane + application workloads)
 - **Inference Node (B)**: 8-core CPU, 16 threads, 64GB RAM, iGPU shared 3GB 
   (Model serving + local LLM inference [Gemma-2-3B via Ollama])
 - **Constraint**: Both nodes are fixed in specs; no cloud spillover for training.
