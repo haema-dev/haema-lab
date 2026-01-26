@@ -1,5 +1,5 @@
 # .github/workflows/bootstrap.yml
-name: Bootstrap (초기 설치만)
+name: Install k8s
 
 on:
   workflow_dispatch:
@@ -26,32 +26,27 @@ jobs:
             #!/bin/bash
             set -e
             
-            echo "Installing K8s..."
+            echo "=== Installing Docker ==="
+            curl -fsSL https://get.docker.com -o get-docker.sh
+            sudo sh get-docker.sh
+            sudo usermod -aG docker ${{ secrets.USERNAME }}
             
-            if ! command -v kubeadm &> /dev/null; then
-              # Docker 설치
-              curl -fsSL https://get.docker.com -o get-docker.sh
-              sudo sh get-docker.sh
-              
-              # Kubernetes 설치
-              sudo apt-get update
-              sudo apt-get install -y apt-transport-https ca-certificates curl
-              
-              curl -fsSLo /usr/share/keyrings/kubernetes-archive-keyring.gpg https://dl.k8s.io/apt/doc/apt-key.gpg
-              echo "deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
-              
-              sudo apt-get update
-              sudo apt-get install -y kubelet kubeadm kubectl
-              sudo apt-mark hold kubelet kubeadm kubectl
-              
-              # K8s 초기화
-              echo "Initializing K8s cluster..."
-              sudo kubeadm init --pod-network-cidr=10.244.0.0/16 --skip-phases=addon/kube-proxy
-              
-              echo "K8s installation complete"
-            else
-              echo "kubeadm already installed"
-            fi
+            echo "=== Installing Kubernetes ==="
+            sudo apt-get update
+            sudo apt-get install -y apt-transport-https ca-certificates curl
+            
+            curl -fsSLo /usr/share/keyrings/kubernetes-archive-keyring.gpg https://dl.k8s.io/apt/doc/apt-key.gpg
+            echo "deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+            
+            sudo apt-get update
+            sudo apt-get install -y kubelet kubeadm kubectl
+            sudo apt-mark hold kubelet kubeadm kubectl
+            
+            echo "=== Initializing K8s cluster ==="
+            sudo kubeadm init --pod-network-cidr=10.244.0.0/16 --skip-phases=addon/kube-proxy
+            
+            echo "=== K8s installation complete ==="
+            sudo kubeadm version
       
       # ===== 2단계: ArgoCD 설치 =====
       - name: Install ArgoCD
