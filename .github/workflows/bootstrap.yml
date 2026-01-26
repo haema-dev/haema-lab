@@ -30,7 +30,10 @@ jobs:
             echo "=== K8s Setup with Kubespray ==="
             
             sudo apt-get update
-            sudo apt-get install -y ansible-core git
+            sudo apt-get install -y python3-pip git
+            
+            # Ansible 2.17+ 설치 (pip로)
+            sudo pip3 install ansible-core>=2.17.3 --break-system-packages
             
             cd /tmp
             rm -rf kubespray || true
@@ -125,7 +128,7 @@ jobs:
             
             echo "🎉 === ArgoCD Installation Complete ==="
       
-            
+
       - name: Install Prometheus & Grafana
         uses: appleboy/ssh-action@master
         with:
