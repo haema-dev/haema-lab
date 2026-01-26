@@ -26,10 +26,31 @@ jobs:
             #!/bin/bash
             set -e
             
+            echo "Installing K8s..."
+            
             if ! command -v kubeadm &> /dev/null; then
-              # K8s 설치 로직
-              curl -sfL https://raw.githubusercontent.com/.../install.sh | bash
-              kubeadm init --pod-network-cidr=10.244.0.0/16
+              # Docker 설치
+              curl -fsSL https://get.docker.com -o get-docker.sh
+              sudo sh get-docker.sh
+              
+              # Kubernetes 설치
+              sudo apt-get update
+              sudo apt-get install -y apt-transport-https ca-certificates curl
+              
+              curl -fsSLo /usr/share/keyrings/kubernetes-archive-keyring.gpg https://dl.k8s.io/apt/doc/apt-key.gpg
+              echo "deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+              
+              sudo apt-get update
+              sudo apt-get install -y kubelet kubeadm kubectl
+              sudo apt-mark hold kubelet kubeadm kubectl
+              
+              # K8s 초기화
+              echo "Initializing K8s cluster..."
+              sudo kubeadm init --pod-network-cidr=10.244.0.0/16 --skip-phases=addon/kube-proxy
+              
+              echo "K8s installation complete"
+            else
+              echo "kubeadm already installed"
             fi
       
       # ===== 2단계: ArgoCD 설치 =====
