@@ -1,0 +1,10 @@
+# sentence-transformers
+# chromadb
+ansible>=2.14.0,<10.0.0
+netaddr>=0.8.0
+jmespath>=0.10.0
+cryptography>=2.8
+PyYAML>=5.1
+ruamel.yaml>=0.16.10
+jinja2>=2.11.0
+markupsafe>=2.0
