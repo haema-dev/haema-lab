@@ -19,7 +19,7 @@ jobs:
         uses: appleboy/ssh-action@master
         with:
             host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
-            username: ${{ secrets.USERNAME }}e
+            username: ${{ secrets.USERNAME }}
             key: ${{ secrets.SSH_PRIVATE_KEY }}
             script: |
                 echo "Test 1: whoami"
