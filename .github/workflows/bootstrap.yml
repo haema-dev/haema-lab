@@ -13,14 +13,14 @@ jobs:
       - name: Connect to Tailscale
         uses: tailscale/github-action@v2
         with:
-          authkey: ${{ secrets.TAILSCALE_OAUTH_TOKEN }}
+          authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
 
       # ===== 1단계: K8s 설치 =====
       - name: Install K8s (kubeadm)
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
-          username: ubuntu
+          username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             #!/bin/bash
@@ -37,7 +37,7 @@ jobs:
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
-          username: ubuntu
+          username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             #!/bin/bash
@@ -53,7 +53,7 @@ jobs:
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
-          username: ubuntu
+          username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             #!/bin/bash
@@ -63,7 +63,7 @@ jobs:
             
             # GitHub SSH 키 시크릿 생성
             kubectl -n argocd create secret generic github-ssh \
-              --from-literal=sshPrivateKey='${{ secrets.GITHUB_SSH_PRIVATE_KEY }}' \
+              --from-literal=sshPrivateKey='${{ secrets.SSH_PRIVATE_KEY_GITHUB }}' \
               --dry-run=client -o yaml | kubectl apply -f -
             
             # ArgoCD가 GitHub 레포를 감시하도록 설정
