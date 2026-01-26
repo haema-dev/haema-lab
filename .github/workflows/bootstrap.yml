@@ -5,7 +5,7 @@ on:
   push:
     branches: [ master ]
     paths:
-      - '.github/workflows/bootstrap.yml'
+      - '.github/workflows/*.yml'
 
 jobs:
   setup:
