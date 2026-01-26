@@ -5,7 +5,7 @@
 | Stage | Planned | Actual | Variance | Delay Analysis & Action Items |
 | :--- | :--- | :--- | :---: | :--- |
 | **01. System Design** | Jan 16 - Jan 19 | Jan 16 - Jan 19 | 0d | **[Complete]** Architecture finalized for fixed hardware baseline. |
-| **02. DevOps & Environment** | Jan 20 - Jan 21 | Jan 20 - **Ongoing** | 0d | **[Status]** Configuring CI/CD pipelines. Currently on track. |
+| **02. DevOps & Environment** | Jan 23 - Jan 24 | Jan 23 - **Ongoing** | 0d | **[Status]** Configuring CI/CD pipelines. Currently on track. |
 
 > **Current Status:** 🏗️ Stage 02 (DevOps & Environment) in progress.
 
@@ -18,7 +18,7 @@
 
 **Hardware Topology**: 
 - **Compute Node (A)**: 6-core CPU, 12 threads, 32GB RAM (Kubernetes control plane + application workloads)
-- **Inference Node (B)**: 8-core CPU, 16 threads, 64GB RAM, iGPU shared 3GB 
+- **Inference Node (B)**: 8-core CPU, 16 threads, 64GB RAM, iGPU
   (Model serving + local LLM inference [Gemma-2-3B via Ollama])
 - **Constraint**: Both nodes are fixed in specs; no cloud spillover for training.
 
