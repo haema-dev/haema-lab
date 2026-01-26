@@ -17,7 +17,6 @@ jobs:
         uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
-      
       - name: Setup K8s with Kubespray
         uses: appleboy/ssh-action@master
         with:
@@ -31,14 +30,12 @@ jobs:
             echo "=== K8s Setup with Kubespray ==="
             
             sudo apt-get update
-            sudo apt-get install -y python3-pip git
+            sudo apt-get install -y ansible-core git
             
             cd /tmp
             rm -rf kubespray || true
             git clone https://github.com/kubernetes-sigs/kubespray.git
             cd kubespray
-            
-            sudo pip3 install -r requirements.txt
             
             cp -rfp inventory/sample inventory/mycluster
             
@@ -84,7 +81,7 @@ jobs:
             sudo chown $(id -u):$(id -g) $HOME/.kube/config
             export KUBECONFIG=$HOME/.kube/config
             
-            echo "⏳ Waiting for K8s API..."
+            echo "⏳ Waiting for K8s..."
             for i in {1..120}; do
               if kubectl cluster-info &> /dev/null; then
                 echo "✅ K8s Ready"
@@ -93,12 +90,11 @@ jobs:
               sleep 3
             done
             
-            echo "=== Cluster Status ==="
             kubectl get nodes
-            kubectl get pods -A
             
-            echo "🎉 === K8s Setup Complete ==="
+            echo "🎉 K8s Setup Complete"
       
+
       - name: Install ArgoCD
         uses: appleboy/ssh-action@master
         with:
@@ -129,6 +125,7 @@ jobs:
             
             echo "🎉 === ArgoCD Installation Complete ==="
       
+            
       - name: Install Prometheus & Grafana
         uses: appleboy/ssh-action@master
         with:
