@@ -1,11 +1,11 @@
-name: Bootstrap K8s & ArgoCD
+name: Bootstrap K8s & ArgoCD & Monitoring
 
 on:
   workflow_dispatch:
   push:
     branches: [ master ]
     paths:
-      - '.github/workflows/*.yml'
+      - '.github/workflows/bootstrap.yml'
 
 jobs:
   setup:
@@ -18,7 +18,7 @@ jobs:
         with:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
       
-      - name: Install K8s (kubeadm)
+      - name: Setup K8s with Kubespray
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
@@ -28,64 +28,76 @@ jobs:
             #!/bin/bash
             set -e
             
-            echo "=== Installing Kubernetes v1.29 ==="
+            echo "=== K8s Setup with Kubespray ==="
             
             sudo apt-get update
-            sudo apt-get install -y ca-certificates curl
+            sudo apt-get install -y python3-pip git
             
-            # GPG 키 다운로드
-            sudo mkdir -p /etc/apt/keyrings
-            sudo sh -c 'curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key > /tmp/k8s.key && cat /tmp/k8s.key | gpg --dearmor > /etc/apt/keyrings/kubernetes-apt-keyring.gpg'
+            cd /tmp
+            rm -rf kubespray || true
+            git clone https://github.com/kubernetes-sigs/kubespray.git
+            cd kubespray
             
-            echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list > /dev/null
+            sudo pip3 install -r requirements.txt
             
-            sudo apt-get update
-            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y kubelet kubeadm kubectl containerd
-            sudo apt-mark hold kubelet kubeadm kubectl
+            cp -rfp inventory/sample inventory/mycluster
             
-            # containerd 설정
-            sudo mkdir -p /etc/containerd
-            sudo containerd config default | sudo tee /etc/containerd/config.toml > /dev/null
-            sudo systemctl restart containerd
-            sudo systemctl enable containerd
-            
-            # 커널 설정
-            sudo modprobe br_netfilter overlay
-            sudo tee /etc/sysctl.d/99-kubernetes.conf > /dev/null <<EOF
-            net.bridge.bridge-nf-call-iptables  = 1
-            net.bridge.bridge-nf-call-ip6tables = 1
-            net.ipv4.ip_forward                 = 1
+            cat > inventory/mycluster/hosts.yaml <<'EOF'
+            all:
+              hosts:
+                node1:
+                  ansible_connection: local
+                  ansible_host: 127.0.0.1
+                  ip: 127.0.0.1
+                  access_ip: 127.0.0.1
+              children:
+                kube_control_plane:
+                  hosts:
+                    node1:
+                kube_node:
+                  hosts:
+                    node1:
+                etcd:
+                  hosts:
+                    node1:
+                k8s_cluster:
+                  children:
+                    kube_control_plane:
+                    kube_node:
             EOF
-            sudo sysctl --system
             
-            # K8s 클러스터 초기화 (이미 존재하면 스킵)
-            if ! sudo test -f /etc/kubernetes/admin.conf; then
-              echo "Initializing K8s cluster..."
-              sudo kubeadm init --pod-network-cidr=10.244.0.0/16
-              
-              # kubeconfig 설정
-              mkdir -p $HOME/.kube
-              sudo cp /etc/kubernetes/admin.conf $HOME/.kube/config
-              sudo chown $(id -u):$(id -g) $HOME/.kube/config
-            else
-              echo "K8s cluster already initialized"
-            fi
+            mkdir -p inventory/mycluster/group_vars/all
+            cat > inventory/mycluster/group_vars/all/all.yml <<'EOF'
+            kube_version: v1.29.8
+            container_manager: containerd
+            dns_mode: coredns
+            kube_pods_subnet: 10.244.0.0/16
+            kube_service_addresses: 10.96.0.0/12
+            EOF
             
-            # API 서버 시작 대기
-            export KUBECONFIG=/etc/kubernetes/admin.conf
-            sudo chmod 644 /etc/kubernetes/admin.conf
+            ansible-playbook -i inventory/mycluster/hosts.yaml \
+              --become --become-user=root \
+              cluster.yml
             
-            echo "Waiting for K8s API server to be ready..."
-            for i in {1..60}; do
+            mkdir -p $HOME/.kube
+            sudo cp /etc/kubernetes/admin.conf $HOME/.kube/config
+            sudo chown $(id -u):$(id -g) $HOME/.kube/config
+            export KUBECONFIG=$HOME/.kube/config
+            
+            echo "⏳ Waiting for K8s API..."
+            for i in {1..120}; do
               if kubectl cluster-info &> /dev/null; then
-                echo "K8s API server is ready"
+                echo "✅ K8s Ready"
                 break
               fi
-              echo "Attempt $i/60 - waiting for API server..."
-              sleep 5
+              sleep 3
             done
             
-            echo "=== K8s installation complete ==="
+            echo "=== Cluster Status ==="
+            kubectl get nodes
+            kubectl get pods -A
+            
+            echo "🎉 === K8s Setup Complete ==="
       
       - name: Install ArgoCD
         uses: appleboy/ssh-action@master
@@ -97,27 +109,94 @@ jobs:
             #!/bin/bash
             set -e
             
-            echo "=== Installing ArgoCD ==="
+            echo "=== ArgoCD Installation ==="
             
-            export KUBECONFIG=/etc/kubernetes/admin.conf
-            sudo chmod 644 /etc/kubernetes/admin.conf
+            export KUBECONFIG=$HOME/.kube/config
             
-            # ArgoCD 네임스페이스가 이미 존재하는지 확인
-            if kubectl get namespace argocd &> /dev/null; then
-              echo "ArgoCD already installed, skipping installation"
-              exit 0
-            fi
-            
-            # ArgoCD 네임스페이스 생성
-            kubectl create namespace argocd
-            
-            # ArgoCD 설치
+            kubectl create namespace argocd || true
             kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
             
-            # 설치 완료 대기
-            sleep 10
+            echo "⏳ Waiting for ArgoCD..."
+            kubectl wait --for=condition=Ready pod -l app.kubernetes.io/part-of=argocd -n argocd --timeout=300s || true
             
-            # ArgoCD 상태 확인
+            echo "=== ArgoCD Status ==="
             kubectl get pods -n argocd
             
-            echo "=== ArgoCD installation complete ==="
+            echo ""
+            echo "🔐 === ArgoCD Initial Password ==="
+            kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+            echo ""
+            
+            echo "🎉 === ArgoCD Installation Complete ==="
+      
+      - name: Install Prometheus & Grafana
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            #!/bin/bash
+            set -e
+            
+            echo "=== Prometheus & Grafana Installation ==="
+            
+            export KUBECONFIG=$HOME/.kube/config
+            
+            # 1. Prometheus 네임스페이스
+            kubectl create namespace prometheus || true
+            
+            # 2. Prometheus 설치 (Helm)
+            curl -fsSL https://raw.githubusercontent.com/prometheus-community/helm-charts/main/prometheus/values.yaml -o /tmp/prometheus-values.yaml
+            
+            # Helm 설치 (없으면)
+            if ! command -v helm &> /dev/null; then
+              curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+            fi
+            
+            # Prometheus Helm Chart 추가
+            helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+            helm repo update
+            
+            # Prometheus 설치
+            helm install prometheus prometheus-community/prometheus \
+              -n prometheus \
+              --set prometheus.prometheusSpec.retention=15d \
+              --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage=10Gi
+            
+            # 3. Grafana 설치 (Helm)
+            helm repo add grafana https://grafana.github.io/helm-charts
+            helm repo update
+            
+            kubectl create namespace grafana || true
+            
+            helm install grafana grafana/grafana \
+              -n grafana \
+              --set adminPassword=admin123 \
+              --set persistence.enabled=true \
+              --set persistence.size=5Gi
+            
+            echo "⏳ Waiting for Prometheus & Grafana..."
+            kubectl wait --for=condition=Ready pod -n prometheus --all --timeout=300s || true
+            kubectl wait --for=condition=Ready pod -n grafana --all --timeout=300s || true
+            
+            echo "=== Services Status ==="
+            echo ""
+            echo "Prometheus:"
+            kubectl get svc -n prometheus
+            echo ""
+            echo "Grafana:"
+            kubectl get svc -n grafana
+            
+            echo ""
+            echo "📊 === Grafana Credentials ==="
+            echo "Username: admin"
+            echo "Password: admin123"
+            echo "Service: kubectl port-forward svc/grafana -n grafana 3000:80"
+            echo ""
+            
+            echo "📈 === Prometheus Access ==="
+            echo "Service: kubectl port-forward svc/prometheus-server -n prometheus 9090:80"
+            echo ""
+            
+            echo "🎉 === Monitoring Setup Complete ==="
