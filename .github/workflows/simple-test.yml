@@ -15,13 +15,20 @@ jobs:
         with:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
       
-      - name: Test SSH Connection
+      - name: Simple Test
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
-          username: ubuntu
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            echo "SSH Connected!"
-            whoami
-            date
+            host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
+            username: ${{ secrets.USERNAME }}e
+            key: ${{ secrets.SSH_PRIVATE_KEY }}
+            script: |
+                echo "Test 1: whoami"
+                whoami
+                
+                echo "Test 2: docker version"
+                docker --version || echo "Docker not installed"
+                
+                echo "Test 3: kubeadm version"
+                sudo kubeadm version || echo "kubeadm not installed"
+                
+                echo "All tests done"
