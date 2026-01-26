@@ -30,12 +30,6 @@ jobs:
             
             echo "=== Installing Kubernetes v1.29 ==="
             
-            # 이미 설치되어 있으면 스킵
-            if command -v kubeadm &> /dev/null && sudo kubeadm version &> /dev/null; then
-              echo "Kubernetes already installed, skipping installation"
-              exit 0
-            fi
-            
             sudo apt-get update
             sudo apt-get install -y ca-certificates curl
             
@@ -64,8 +58,32 @@ jobs:
             EOF
             sudo sysctl --system
             
-            # K8s 클러스터 초기화
-            sudo kubeadm init --pod-network-cidr=10.244.0.0/16
+            # K8s 클러스터 초기화 (이미 존재하면 스킵)
+            if ! sudo test -f /etc/kubernetes/admin.conf; then
+              echo "Initializing K8s cluster..."
+              sudo kubeadm init --pod-network-cidr=10.244.0.0/16
+              
+              # kubeconfig 설정
+              mkdir -p $HOME/.kube
+              sudo cp /etc/kubernetes/admin.conf $HOME/.kube/config
+              sudo chown $(id -u):$(id -g) $HOME/.kube/config
+            else
+              echo "K8s cluster already initialized"
+            fi
+            
+            # API 서버 시작 대기
+            export KUBECONFIG=/etc/kubernetes/admin.conf
+            sudo chmod 644 /etc/kubernetes/admin.conf
+            
+            echo "Waiting for K8s API server to be ready..."
+            for i in {1..60}; do
+              if kubectl cluster-info &> /dev/null; then
+                echo "K8s API server is ready"
+                break
+              fi
+              echo "Attempt $i/60 - waiting for API server..."
+              sleep 5
+            done
             
             echo "=== K8s installation complete ==="
       
