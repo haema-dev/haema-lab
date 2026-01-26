@@ -26,27 +26,24 @@ jobs:
             #!/bin/bash
             set -e
             
-            echo "=== Installing Docker ==="
-            curl -fsSL https://get.docker.com -o get-docker.sh
-            sudo sh get-docker.sh
-            sudo usermod -aG docker ${{ secrets.USERNAME }}
-            
             echo "=== Installing Kubernetes ==="
-            sudo apt-get update
-            sudo apt-get install -y apt-transport-https ca-certificates curl
-            
-            curl -fsSLo /usr/share/keyrings/kubernetes-archive-keyring.gpg https://dl.k8s.io/apt/doc/apt-key.gpg
-            echo "deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
             
             sudo apt-get update
-            sudo apt-get install -y kubelet kubeadm kubectl
+            sudo apt-get install -y curl gnupg2 software-properties-common
+            
+            # Kubernetes 리포지토리 추가 (더 안정적인 방법)
+            curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+            echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+            
+            sudo apt-get update
+            sudo apt-get install -y kubelet kubeadm kubectl containerd
             sudo apt-mark hold kubelet kubeadm kubectl
             
             echo "=== Initializing K8s cluster ==="
-            sudo kubeadm init --pod-network-cidr=10.244.0.0/16 --skip-phases=addon/kube-proxy
+            sudo kubeadm init --pod-network-cidr=10.244.0.0/16
             
             echo "=== K8s installation complete ==="
-            sudo kubeadm version
+            kubeadm version
       
       # ===== 2단계: ArgoCD 설치 =====
       - name: Install ArgoCD
