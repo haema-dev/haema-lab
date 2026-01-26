@@ -1,8 +1,11 @@
-# .github/workflows/bootstrap.yml
-name: Install k8s
+name: Bootstrap K8s & ArgoCD
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ master ]
+    paths:
+      - '.github/workflows/bootstrap.yml'
 
 jobs:
   setup:
@@ -14,8 +17,7 @@ jobs:
         uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
-
-      # ===== 1단계: K8s 설치 =====
+      
       - name: Install K8s (kubeadm)
         uses: appleboy/ssh-action@master
         with:
@@ -26,58 +28,40 @@ jobs:
             #!/bin/bash
             set -e
             
-            echo "=== Installing Kubernetes ==="
+            echo "=== Installing Kubernetes v1.29 ==="
             
-            # 1. 기본 패키지
             sudo apt-get update
-            sudo apt-get install -y ca-certificates curl
+            sudo apt-get install -y ca-certificates curl gpg
             
-            # 2. Kubernetes 리포지토리 추가
-            sudo install -m 0755 -d /etc/apt/keyrings
-            sudo curl -fsSLo /etc/apt/keyrings/kubernetes-archive-keyring.gpg https://dl.k8s.io/apt/doc/apt-key.gpg
-            echo "deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+            # 최신 공식 K8s 리포지토리
+            sudo mkdir -p /etc/apt/keyrings
+            curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+            echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
             
-            # 3. K8s 설치
             sudo apt-get update
             sudo DEBIAN_FRONTEND=noninteractive apt-get install -y kubelet kubeadm kubectl containerd
             sudo apt-mark hold kubelet kubeadm kubectl
             
-            # 4. containerd 설정
-            echo "=== Configuring containerd ==="
+            # containerd 설정
             sudo mkdir -p /etc/containerd
             sudo containerd config default | sudo tee /etc/containerd/config.toml > /dev/null
             sudo systemctl restart containerd
+            sudo systemctl enable containerd
             
-            # 5. 커널 모듈 로드
-            echo "=== Loading kernel modules ==="
-            sudo modprobe br_netfilter
-            sudo modprobe overlay
-            
-            # 6. sysctl 설정
-            echo "=== Configuring sysctl ==="
-            sudo tee /etc/sysctl.d/99-kubernetes-cri.conf > /dev/null <<EOF
+            # 커널 설정
+            sudo modprobe br_netfilter overlay
+            sudo tee /etc/sysctl.d/99-kubernetes.conf > /dev/null <<EOF
             net.bridge.bridge-nf-call-iptables  = 1
             net.bridge.bridge-nf-call-ip6tables = 1
             net.ipv4.ip_forward                 = 1
             EOF
             sudo sysctl --system
             
-            # 7. kubelet 시작
-            echo "=== Starting kubelet ==="
-            sudo systemctl enable kubelet
-            sudo systemctl start kubelet
-            
-            # 8. containerd 상태 확인
-            echo "=== Verifying containerd ==="
-            sudo systemctl status containerd
-            
-            echo "=== Initializing K8s cluster ==="
+            # K8s 클러스터 초기화
             sudo kubeadm init --pod-network-cidr=10.244.0.0/16
             
             echo "=== K8s installation complete ==="
-            kubeadm version
       
-      # ===== 2단계: ArgoCD 설치 =====
       - name: Install ArgoCD
         uses: appleboy/ssh-action@master
         with:
@@ -90,51 +74,9 @@ jobs:
             
             export KUBECONFIG=/etc/kubernetes/admin.conf
             
+            echo "=== Installing ArgoCD ==="
+            
             kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
             kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-      
-      # ===== 3단계: ArgoCD에 GitHub 레포 등록 =====
-      - name: Register GitHub Repository in ArgoCD
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            #!/bin/bash
-            set -e
             
-            export KUBECONFIG=/etc/kubernetes/admin.conf
-            
-            # GitHub SSH 키 시크릿 생성
-            kubectl -n argocd create secret generic github-ssh \
-              --from-literal=sshPrivateKey='${{ secrets.SSH_PRIVATE_KEY_GITHUB }}' \
-              --dry-run=client -o yaml | kubectl apply -f -
-            
-            # ArgoCD가 GitHub 레포를 감시하도록 설정
-            cat > /tmp/root-app.yaml << 'EOF'
-            apiVersion: argoproj.io/v1alpha1
-            kind: Application
-            metadata:
-              name: root
-              namespace: argocd
-            spec:
-              project: default
-              source:
-                repoURL: git@github.com:YOUR_USERNAME/YOUR_REPO.git
-                targetRevision: main
-                path: cluster/
-              destination:
-                server: https://kubernetes.default.svc
-                namespace: argocd
-              syncPolicy:
-                automated:
-                  prune: true
-                  selfHeal: true
-                  # ← 이것이 핵심! ArgoCD가 자동으로 Git 변경사항을 감시
-            EOF
-            
-            kubectl apply -f /tmp/root-app.yaml
-            
-            echo "=== ArgoCD is now watching GitHub repository ==="
-            echo "All further deployments will be automatic"
+            echo "=== ArgoCD installation complete ==="
