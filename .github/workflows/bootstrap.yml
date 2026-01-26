@@ -13,8 +13,7 @@ jobs:
       - name: Connect to Tailscale
         uses: tailscale/github-action@v2
         with:
-          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }} # Auth keys
-          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_TOKEN }} # Auth keys
+          authkey: ${{ secrets.TAILSCALE_OAUTH_TOKEN }}
 
       # ===== 1단계: K8s 설치 =====
       - name: Install K8s (kubeadm)
