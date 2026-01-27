@@ -105,21 +105,21 @@ jobs:
             echo "🎉 K8s Setup Complete"
 
             # Kubespray가 nologin으로 설정한 것 복구
-            sudo usermod -s /bin/bash ${{ secrets.USERNAME }}
+            # sudo usermod -s /bin/bash ${{ secrets.USERNAME }}
 
 
-      - name: Fix Shell Access
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            #!/bin/bash
-            set -e
+      # - name: Fix Shell Access
+      #   uses: appleboy/ssh-action@master
+      #   with:
+      #     host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
+      #     username: ${{ secrets.USERNAME }}
+      #     key: ${{ secrets.SSH_PRIVATE_KEY }}
+      #     script: |
+      #       #!/bin/bash
+      #       set -e
             
-            sudo usermod -s /bin/bash kube
-            echo "✅ Shell Access Restored"
+      #       sudo usermod -s /bin/bash kube
+      #       echo "✅ Shell Access Restored"
 
 
       # - name: Install ArgoCD
