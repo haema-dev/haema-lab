@@ -38,7 +38,7 @@ jobs:
             git clone https://github.com/kubernetes-sigs/kubespray.git
             cd kubespray
             
-            # 버전 명시 없이 requirements.txt만 설치
+            # Kubespray의 requirements.txt에서 Ansible 버전 자동 관리
             sudo pip3 install -r requirements.txt --break-system-packages
             
             cp -rfp inventory/sample inventory/mycluster
@@ -69,7 +69,7 @@ jobs:
             
             mkdir -p inventory/mycluster/group_vars/all
             cat > inventory/mycluster/group_vars/all/all.yml <<'EOF'
-            kube_version: v1.29.8
+            kube_version: "1.30.5"
             container_manager: containerd
             dns_mode: coredns
             kube_pods_subnet: 10.244.0.0/16
@@ -147,25 +147,22 @@ jobs:
             # 1. Prometheus 네임스페이스
             kubectl create namespace prometheus || true
             
-            # 2. Prometheus 설치 (Helm)
-            curl -fsSL https://raw.githubusercontent.com/prometheus-community/helm-charts/main/prometheus/values.yaml -o /tmp/prometheus-values.yaml
-            
-            # Helm 설치 (없으면)
+            # 2. Helm 설치 (없으면)
             if ! command -v helm &> /dev/null; then
               curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
             fi
             
-            # Prometheus Helm Chart 추가
+            # 3. Prometheus 설치 (Helm)
             helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
             helm repo update
             
-            # Prometheus 설치
             helm install prometheus prometheus-community/prometheus \
               -n prometheus \
               --set prometheus.prometheusSpec.retention=15d \
-              --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage=10Gi
+              --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage=10Gi \
+              || echo "Prometheus already installed"
             
-            # 3. Grafana 설치 (Helm)
+            # 4. Grafana 설치 (Helm)
             helm repo add grafana https://grafana.github.io/helm-charts
             helm repo update
             
@@ -175,7 +172,8 @@ jobs:
               -n grafana \
               --set adminPassword=$GRAFANA_PASSWORD \
               --set persistence.enabled=true \
-              --set persistence.size=5Gi
+              --set persistence.size=5Gi \
+              || echo "Grafana already installed"
             
             echo "⏳ Waiting for Prometheus & Grafana..."
             kubectl wait --for=condition=Ready pod -n prometheus --all --timeout=300s || true
@@ -190,7 +188,7 @@ jobs:
             kubectl get svc -n grafana
             
             echo ""
-            echo "📊 === Grafana Credentials ==="
+            echo "📊 === Grafana Access ==="
             echo "Service: kubectl port-forward svc/grafana -n grafana 3000:80"
             echo ""
             
