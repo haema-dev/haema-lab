@@ -3,7 +3,10 @@ name: Cleanup K8s Only
 
 on:
   workflow_dispatch:
-
+  push:
+    branches: [ master ]
+    paths:
+      - '.github/workflows/cleanup.yml'
 
 jobs:
   cleanup:
