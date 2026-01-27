@@ -201,7 +201,7 @@ jobs:
             sed -i "s|\$USERNAME|$USERNAME|g" "$INVENTORY_DIR/hosts.yaml"
             sed -i "s|\$HOST_IP|$HOST_IP|g" "$INVENTORY_DIR/hosts.yaml"
             
-            # all.yml - 당신의 Secrets 값 사용
+            # all.yml - Secrets 값 사용
             cat > "$INVENTORY_DIR/group_vars/all/all.yml" <<EOF
             kube_version: "1.31.6"
             container_manager: containerd
@@ -255,7 +255,7 @@ jobs:
             echo "✅ Kubespray completed"
             
             # ============================================
-            # 7️⃣ kubeconfig 설정 (당신의 USERNAME 사용)
+            # 7️⃣ kubeconfig 설정
             # ============================================
             echo ""
             echo "🔑 Setting up kubeconfig..."
@@ -273,7 +273,7 @@ jobs:
             fi
             
             # ============================================
-            # 8️⃣ Shell 수정 (당신의 USERNAME 사용)
+            # 8️⃣ Shell 수정
             # ============================================
             echo ""
             echo "🔧 Fixing shell configuration..."
