@@ -17,6 +17,23 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
+      - name: Check Secrets
+        run: |
+          if [ -z "$ID" ]; then
+            echo "❌ CLIENT_ID is EMPTY"
+          else
+            echo "✅ CLIENT_ID exists (${#ID} chars)"
+          fi
+          
+          if [ -z "$SECRET" ]; then
+            echo "❌ CLIENT_SECRET is EMPTY"
+          else
+            echo "✅ CLIENT_SECRET exists (${#SECRET} chars)"
+          fi
+        env:
+          ID: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
+          SECRET: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
+
       - name: Connect to Tailscale
         uses: tailscale/github-action@v2
         with:
