@@ -122,8 +122,6 @@ jobs:
             ansible-playbook -i inventory/mycluster/hosts.yaml \
             --become \
             -e "kube_version=$KUBE_VERSION" \
-            -e "ansible_timeout=300" \
-            -e "ansible_connection_timeout=60" \
             cluster.yml
             kubectl get nodes || echo "kubectl failed"
             echo "🎉 K8s Setup Complete"
