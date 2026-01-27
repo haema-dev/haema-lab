@@ -106,12 +106,12 @@ jobs:
 
             sudo su -
 
-            # 사용자를 위해 kubeconfig 설정
+            # Set kubeconfig
             mkdir -p /home/${{ secrets.USERNAME }}/.kube
             cp /etc/kubernetes/admin.conf /home/${{ secrets.USERNAME }}/.kube/config
             chown -R ${{ secrets.USERNAME }}:${{ secrets.USERNAME }} /home/${{ secrets.USERNAME }}/.kube
             chmod 600 /home/${{ secrets.USERNAME }}/.kube/config
 
-            # 확인
+            # Check
             ls -la /home/${{ secrets.USERNAME }}/.kube/config
             echo "✅ K8s setup complete"
