@@ -10,6 +10,10 @@ on:
 jobs:
   setup:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # tailscale 접속 위해 추가
+
     steps:
       - uses: actions/checkout@v3
       
