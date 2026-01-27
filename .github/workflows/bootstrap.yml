@@ -17,6 +17,7 @@ jobs:
         uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
+
       - name: Setup K8s with Kubespray
         uses: appleboy/ssh-action@master
         with:
@@ -32,13 +33,13 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y python3-pip git
             
-            # Ansible 2.17+ 설치 (pip로)
-            sudo pip3 install ansible-core>=2.17.3 --break-system-packages
-            
             cd /tmp
             rm -rf kubespray || true
             git clone https://github.com/kubernetes-sigs/kubespray.git
             cd kubespray
+            
+            # 버전 명시 없이 requirements.txt만 설치
+            sudo pip3 install -r requirements.txt --break-system-packages
             
             cp -rfp inventory/sample inventory/mycluster
             
@@ -96,7 +97,6 @@ jobs:
             kubectl get nodes
             
             echo "🎉 K8s Setup Complete"
-      
 
       - name: Install ArgoCD
         uses: appleboy/ssh-action@master
@@ -127,10 +127,11 @@ jobs:
             echo ""
             
             echo "🎉 === ArgoCD Installation Complete ==="
-      
 
       - name: Install Prometheus & Grafana
         uses: appleboy/ssh-action@master
+        env:
+          GRAFANA_PASSWORD: ${{ secrets.GRAFANA_PASSWORD }}
         with:
           host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
           username: ${{ secrets.USERNAME }}
@@ -172,7 +173,7 @@ jobs:
             
             helm install grafana grafana/grafana \
               -n grafana \
-              --set adminPassword=admin123 \
+              --set adminPassword=$GRAFANA_PASSWORD \
               --set persistence.enabled=true \
               --set persistence.size=5Gi
             
@@ -190,8 +191,6 @@ jobs:
             
             echo ""
             echo "📊 === Grafana Credentials ==="
-            echo "Username: admin"
-            echo "Password: admin123"
             echo "Service: kubectl port-forward svc/grafana -n grafana 3000:80"
             echo ""
             

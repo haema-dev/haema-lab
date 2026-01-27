@@ -5,7 +5,7 @@
 | Stage | Planned | Actual | Variance | Delay Analysis & Action Items |
 | :--- | :--- | :--- | :---: | :--- |
 | **01. System Design** | Jan 16 - Jan 19 | Jan 16 - Jan 19 | 0d | **[Complete]** Architecture finalized for fixed hardware baseline. |
-| **02. DevOps & Environment** | Jan 23 - Jan 24 | Jan 26 - **Ongoing** | - | - |
+| **02. DevOps & Environment** | Jan 23 - Jan 24 | Jan 26 - **Ongoing** | - | **[Cause]** Changes to Kubernetes via Kubespray |
 
 > **Current Status:** 🏗️ Stage 02 (DevOps & Environment) in progress.
 
