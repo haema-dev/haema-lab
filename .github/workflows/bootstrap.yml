@@ -56,7 +56,6 @@ jobs:
           host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
           username: ${{ secrets.FIRST_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script_stop_on_error: true
           script: |
             set -euo pipefail
             
