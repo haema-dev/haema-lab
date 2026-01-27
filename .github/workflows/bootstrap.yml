@@ -48,7 +48,6 @@ jobs:
               exit 0
             fi
             
-            echo "🔄 Initializing cluster..."
             echo "3️⃣ etcd 정리"
             sudo systemctl stop etcd || true
             sudo systemctl disable etcd || true
