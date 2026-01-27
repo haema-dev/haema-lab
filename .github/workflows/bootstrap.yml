@@ -48,8 +48,8 @@ jobs:
             git clone https://github.com/kubernetes-sigs/kubespray.git
             cd kubespray
             
-            # v2.28.1 LTS version
-            git checkout v2.28.1
+            # ubuntu 24.04 bugfix version
+            git checkout v2.29.0
             
             # Install requirements vis Kubespray in virtual env
             pip install -r requirements.txt
@@ -102,14 +102,12 @@ jobs:
             sudo usermod -s /bin/bash $(whoami)
             echo "✅ Shell Fixed"
 
-            sudo su -
-
-            # Set kubeconfig
-            mkdir -p /home/${{ secrets.USERNAME }}/.kube
-            cp /etc/kubernetes/admin.conf /home/${{ secrets.USERNAME }}/.kube/config
-            chown -R ${{ secrets.USERNAME }}:${{ secrets.USERNAME }} /home/${{ secrets.USERNAME }}/.kube
-            chmod 600 /home/${{ secrets.USERNAME }}/.kube/config
+            echo "🔍 Setting up kubeconfig"
+            sudo mkdir -p /home/${{ secrets.USERNAME }}/.kube
+            sudo cp /etc/kubernetes/admin.conf /home/${{ secrets.USERNAME }}/.kube/config
+            sudo chown -R ${{ secrets.USERNAME }}:${{ secrets.USERNAME }} /home/${{ secrets.USERNAME }}/.kube
+            sudo chmod 600 /home/${{ secrets.USERNAME }}/.kube/config
 
             # Check
-            ls -la /home/${{ secrets.USERNAME }}/.kube/config
+            sudo ls -la /home/${{ secrets.USERNAME }}/.kube/config
             echo "✅ K8s setup complete"
