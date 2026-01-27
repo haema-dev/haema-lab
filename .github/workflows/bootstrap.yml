@@ -37,25 +37,39 @@ jobs:
             set -e
 
             echo "🔍 Complete cleanup"
-            echo "1️⃣ 포트 해제"
-            sudo fuser -k 6443/tcp 2>/dev/null || true
-            sudo fuser -k 10259/tcp 2>/dev/null || true
-            sudo fuser -k 10257/tcp 2>/dev/null || true
+            echo "1️⃣ 프로세스 강제 종료 및 포트 해제"
+            pkill -9 kube-apiserver 2>/dev/null || true
+            pkill -9 kube-controller-manager 2>/dev/null || true
+            pkill -9 kube-scheduler 2>/dev/null || true
+            pkill -9 kubelet 2>/dev/null || true
+            pkill -9 etcd 2>/dev/null || true
+            sleep 2
+            fuser -k 6443/tcp 2>/dev/null || true
+            fuser -k 10259/tcp 2>/dev/null || true
+            fuser -k 10257/tcp 2>/dev/null || true
+            fuser -k 10250/tcp 2>/dev/null || true
+            fuser -k 2379/tcp 2>/dev/null || true
+            fuser -k 2380/tcp 2>/dev/null || true
             
             echo "2️⃣ kubeadm 확인"
             if [ -f /etc/kubernetes/manifests/kube-apiserver.yaml ]; then
-              echo "✅ Kubernetes already initialized, skipping..."
+              echo "✅ Kubernetes already initialized"
               exit 0
             fi
             
             echo "3️⃣ etcd 정리"
-            sudo systemctl stop etcd || true
-            sudo systemctl disable etcd || true
-            sudo rm -rf /var/lib/etcd /etc/etcd /etc/ssl/etcd /opt/etcd*
+            systemctl stop etcd 2>/dev/null || true
+            systemctl disable etcd 2>/dev/null || true
+            rm -rf /var/lib/etcd /etc/etcd /etc/ssl/etcd /opt/etcd* 2>/dev/null || true
             
-            echo "4️⃣ kubelet 정리"
-            sudo systemctl stop kubelet || true
-            sudo rm -rf /var/lib/kubelet /etc/kubernetes
+            echo "4️⃣ kubelet 및 container 정리"
+            systemctl stop kubelet 2>/dev/null || true
+            systemctl stop kube-* 2>/dev/null || true
+            rm -rf /var/lib/kubelet /etc/kubernetes /etc/cni /opt/cni 2>/dev/null || true
+            rm -rf /var/run/kubernetes 2>/dev/null || true
+            crictl rm -a 2>/dev/null || true
+            crictl rmi --prune 2>/dev/null || true
+            ctr image rm -f 2>/dev/null || true
             
             # 🔍 5초 대기
             sleep 5
