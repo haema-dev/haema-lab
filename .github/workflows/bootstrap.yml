@@ -37,6 +37,9 @@ jobs:
             rm -rf kubespray || true
             git clone https://github.com/kubernetes-sigs/kubespray.git
             cd kubespray
+
+            # 최신 LTS 버전 체크아웃
+            git checkout v2.28.1
             
             # Kubespray의 requirements.txt에서 Ansible 버전 자동 관리
             sudo pip3 install -r requirements.txt --break-system-packages
@@ -67,9 +70,8 @@ jobs:
                     kube_node:
             EOF
             
-            mkdir -p inventory/mycluster/group_vars/all
             cat > inventory/mycluster/group_vars/all/all.yml <<'EOF'
-            kube_version: "1.30.5"
+            kube_version: "1.31.6"  # v2.28.1에서 지원하는 LTS 버전
             container_manager: containerd
             dns_mode: coredns
             kube_pods_subnet: 10.244.0.0/16
