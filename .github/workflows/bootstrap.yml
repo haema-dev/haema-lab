@@ -10,36 +10,17 @@ on:
 jobs:
   setup:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write # tailscale 접속 위해 추가
 
     steps:
       - uses: actions/checkout@v3
       
-      - name: Check Secrets
-        run: |
-          if [ -z "$ID" ]; then
-            echo "❌ CLIENT_ID is EMPTY"
-          else
-            echo "✅ CLIENT_ID exists (${#ID} chars)"
-          fi
-          
-          if [ -z "$SECRET" ]; then
-            echo "❌ CLIENT_SECRET is EMPTY"
-          else
-            echo "✅ CLIENT_SECRET exists (${#SECRET} chars)"
-          fi
-        env:
-          ID: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
-          SECRET: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
-
       - name: Connect to Tailscale
         uses: tailscale/github-action@v2
         with:
           oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
           version: 1.92.5
+          tags: ${{ secrets.TAILSCALE_AUTH_TAGS }}
 
 
       - name: Setup K8s with Kubespray
