@@ -38,28 +38,36 @@ jobs:
 
             echo "🔍 Complete cleanup"
 
-            # 1️⃣ 포트 해제 (없으면 무시)
+            # 포트 해제
             sudo fuser -k 6443/tcp 2>/dev/null || true
             sudo fuser -k 10259/tcp 2>/dev/null || true
             sudo fuser -k 10257/tcp 2>/dev/null || true
             
-            # 2️⃣ kubeadm이 이미 실행됐는지 확인
+            # kubeadm이 이미 실행됐는지 확인
             if [ -f /etc/kubernetes/manifests/kube-apiserver.yaml ]; then
               echo "✅ Kubernetes already initialized, skipping..."
               exit 0
             fi
             
-            # 3️⃣ 아니면 안전하게 정리
             echo "🔄 Initializing cluster..."
+            # etcd 완전 정지
+            sudo systemctl stop etcd || true
+            sudo systemctl disable etcd || true
             
-            sudo systemctl stop etcd kubelet || true
-            sudo rm -rf /var/lib/etcd /var/lib/kubelet /etc/kubernetes /etc/etcd || true
+            # etcd 모든 데이터 & 설정 삭제
+            sudo rm -rf /var/lib/etcd
+            sudo rm -rf /etc/etcd
+            sudo rm -rf /etc/ssl/etcd
+            sudo rm -rf /opt/etcd*
             
-            # 4️⃣ 서비스 재시작
-            sudo systemctl start etcd
+            # kubelet 정리
+            sudo systemctl stop kubelet || true
+            sudo rm -rf /var/lib/kubelet /etc/kubernetes
+            
+            # 5초 대기
             sleep 5
             
-            # 5️⃣ Kubespray 실행
+            echo "🔍 Ready for Kubespray"
             cd /tmp/kubespray
             ansible-playbook -i inventory/mycluster/hosts.yaml \
               --become \
