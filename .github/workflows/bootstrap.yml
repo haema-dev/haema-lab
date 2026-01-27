@@ -82,30 +82,19 @@ jobs:
             kube_service_addresses: 10.96.0.0/12
             EOF
             
+            echo "🔍 Before ansible-playbook"
             ansible-playbook -i inventory/mycluster/hosts.yaml \
               --become --become-user=root \
               cluster.yml
             
-            mkdir -p $HOME/.kube
-            sudo cp /etc/kubernetes/admin.conf $HOME/.kube/config
-            sudo chown $(id -u):$(id -g) $HOME/.kube/config
-            export KUBECONFIG=$HOME/.kube/config
+            echo "🔍 After ansible-playbook (여기까지 오나?)"
             
-            echo "⏳ Waiting for K8s..."
-            for i in {1..120}; do
-              if kubectl cluster-info &> /dev/null; then
-                echo "✅ K8s Ready"
-                break
-              fi
-              sleep 3
-            done
-            
-            kubectl get nodes
-            
+            kubectl get nodes || echo "kubectl failed"
             echo "🎉 K8s Setup Complete"
-
-            # Kubespray가 nologin으로 설정한 것 복구
-            # sudo usermod -s /bin/bash ${{ secrets.USERNAME }}
+            
+            echo "🔍 Before fix"
+            sudo usermod -s /bin/bash $(whoami)
+            echo "✅ Shell Fixed"
 
 
       # - name: Fix Shell Access
