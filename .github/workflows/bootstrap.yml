@@ -203,17 +203,27 @@ jobs:
             
             # all.yml - 당신의 Secrets 값 사용
             cat > "$INVENTORY_DIR/group_vars/all/all.yml" <<EOF
-            kube_version: $KUBE_VERSION
+            kube_version: "1.31.6"
             container_manager: containerd
             dns_mode: coredns
             kube_pods_subnet: 10.244.0.0/16
             kube_service_addresses: 10.96.0.0/12
-            kube_apiserver_advertise_address: $HOST_IP
-            kube_apiserver_bind_address: 0.0.0.0
+            kube_apiserver_advertise_address: 127.0.0.1
+            kube_apiserver_bind_address: "0.0.0.0"
             kubelet_deployment_type: host
             kubeadm_init_timeout: 600
             upgrade_cluster_setup_timeout: 600
             skip_kubelet_systemd_environment_file_checks: true
+
+            # 인증서 주체명 설정 (재생성 방지)
+            apiserver_cert_extra_sans:
+              - "localhost"
+              - "127.0.0.1"
+              - "$HOST_IP"
+              - "kubernetes"
+              - "kubernetes.default"
+              - "kubernetes.default.svc"
+              - "kubernetes.default.svc.cluster.local"
             EOF
             
             # all.yml에서 변수 치환
