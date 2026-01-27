@@ -74,7 +74,8 @@ jobs:
             rm -rf kubespray || true
             git clone https://github.com/kubernetes-sigs/kubespray.git
             cd kubespray
-            git checkout v2.29.0 # ubuntu 24.04 bugfix version
+            # 🔍 ubuntu 24.04 bugfix version
+            git checkout v2.29.0
             
             echo "7️⃣ Install requirements vis Kubespray in virtual env"
             pip install -r requirements.txt
@@ -82,7 +83,7 @@ jobs:
             cp -rfp inventory/sample inventory/mycluster
             
             echo "8️⃣ Before k8s cluster"
-            cat > inventory/mycluster/hosts.yaml <<'HOSTS_EOF'
+            cat > inventory/mycluster/hosts.yaml <<HOSTS_EOF
             all:
               hosts:
                 ${{ secrets.USERNAME }}:
@@ -106,7 +107,7 @@ jobs:
                     kube_node:
             HOSTS_EOF
             
-            cat > inventory/mycluster/group_vars/all/all.yml <<'VARS_EOF'
+            cat > inventory/mycluster/group_vars/all/all.yml <<VARS_EOF
             kube_version: $KUBE_VERSION
             container_manager: containerd
             dns_mode: coredns
