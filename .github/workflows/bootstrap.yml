@@ -87,7 +87,12 @@ jobs:
             dns_mode: coredns
             kube_pods_subnet: 10.244.0.0/16
             kube_service_addresses: 10.96.0.0/12
-            EOF
+            
+            # 추가: API Server 설정 명시
+            kube_apiserver_advertise_address: "{{ hostvars[groups['kube_control_plane'][0]]['ansible_default_ipv4']['address'] }}"
+            kube_apiserver_bind_address: 0.0.0.0
+
+            VARS_EOF
             
             echo "🔍 Before ansible-playbook"
             ansible-playbook -i inventory/mycluster/hosts.yaml \
