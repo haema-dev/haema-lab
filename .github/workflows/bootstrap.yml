@@ -10,7 +10,7 @@ on:
 jobs:
   setup:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v3
@@ -174,7 +174,7 @@ jobs:
             mkdir -p "$INVENTORY_DIR/group_vars/all"
             
             # hosts.yaml - 당신의 Secrets 값 사용
-            cat > "$INVENTORY_DIR/hosts.yaml" <<'HOSTS'
+            cat > "$INVENTORY_DIR/hosts.yaml" <<HOSTS
             all:
               hosts:
                 $USERNAME:
@@ -202,7 +202,7 @@ jobs:
             sed -i "s|\$HOST_IP|$HOST_IP|g" "$INVENTORY_DIR/hosts.yaml"
             
             # all.yml - 당신의 Secrets 값 사용
-            cat > "$INVENTORY_DIR/group_vars/all/all.yml" <<'VARS'
+            cat > "$INVENTORY_DIR/group_vars/all/all.yml" <<EOF
             kube_version: $KUBE_VERSION
             container_manager: containerd
             dns_mode: coredns
@@ -214,7 +214,7 @@ jobs:
             kubeadm_init_timeout: 600
             upgrade_cluster_setup_timeout: 600
             skip_kubelet_systemd_environment_file_checks: true
-            VARS
+            EOF
             
             # all.yml에서 변수 치환
             sed -i "s|\$HOST_IP|$HOST_IP|g" "$INVENTORY_DIR/group_vars/all/all.yml"
