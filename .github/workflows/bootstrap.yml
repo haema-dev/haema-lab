@@ -1,4 +1,4 @@
-name: Bootstrap K8s # & ArgoCD & Monitoring
+name: Kubespray K8s
 
 on:
   workflow_dispatch:
@@ -19,7 +19,7 @@ jobs:
         with:
           oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
-          version: 1.92.5
+          version: 1.94.1
           tags: ${{ secrets.TAILSCALE_AUTH_TAGS }}
 
 
