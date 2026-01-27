@@ -31,18 +31,22 @@ jobs:
             echo "=== K8s Setup with Kubespray ==="
             
             sudo apt-get update
-            sudo apt-get install -y python3-pip git
+            sudo apt-get install -y python3-pip python3-venv git
+            
+            # 가상환경 생성
+            python3 -m venv ~/.venv-kubespray
+            source ~/.venv-kubespray/bin/activate
             
             cd /tmp
             rm -rf kubespray || true
             git clone https://github.com/kubernetes-sigs/kubespray.git
             cd kubespray
-
-            # 최신 LTS 버전 체크아웃
+            
+            # v2.28.1 LTS 버전
             git checkout v2.28.1
             
-            # Kubespray의 requirements.txt에서 Ansible 버전 자동 관리
-            sudo pip3 install -r requirements.txt --break-system-packages
+            # 가상환경에서 설치
+            pip install -r requirements.txt
             
             cp -rfp inventory/sample inventory/mycluster
             
