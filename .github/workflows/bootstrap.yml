@@ -56,6 +56,7 @@ jobs:
             
             cp -rfp inventory/sample inventory/mycluster
             
+            echo "🔍 Before k8s cluster"
             cat > inventory/mycluster/hosts.yaml <<'HOSTS_EOF'
             all:
               hosts:
@@ -94,9 +95,6 @@ jobs:
             ansible-playbook -i inventory/mycluster/hosts.yaml \
               --become \
               cluster.yml
-            
-            echo "🔍 After ansible-playbook"
-            
             kubectl get nodes || echo "kubectl failed"
             echo "🎉 K8s Setup Complete"
             
