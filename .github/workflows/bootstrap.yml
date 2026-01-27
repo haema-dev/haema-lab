@@ -75,8 +75,8 @@ jobs:
             sleep 5
             
             echo "5️⃣ K8s Setup with Kubespray"            
-            sudo apt-get update
-            sudo apt-get install -y python3-pip python3-venv git
+            apt-get update -qq
+            apt-get install -y -qq python3-pip python3-venv git
             
             # 🔍 Create virtual env
             python3 -m venv ~/.venv-kubespray
@@ -94,9 +94,10 @@ jobs:
             pip install -r requirements.txt
             
             cp -rfp inventory/sample inventory/mycluster
+            mkdir -p inventory/mycluster/group_vars/all
             
             echo "8️⃣ Before k8s cluster"
-            cat > inventory/mycluster/hosts.yaml <<'HOSTS_EOF'
+            tee inventory/mycluster/hosts.yaml > /dev/null <<'HOSTS'
             all:
               hosts:
                 ${{ secrets.USERNAME }}:
@@ -118,25 +119,24 @@ jobs:
                   children:
                     kube_control_plane:
                     kube_node:
-            HOSTS_EOF
+            HOSTS
             
             echo "9️⃣ group_vars/all/all.yml"
-            cat > inventory/mycluster/group_vars/all/all.yml <<'VARS_EOF'
+            tee inventory/mycluster/group_vars/all/all.yml > /dev/null <<'VARS'
             kube_version: $KUBE_VERSION
             container_manager: containerd
             dns_mode: coredns
             kube_pods_subnet: 10.244.0.0/16
             kube_service_addresses: 10.96.0.0/12
-            kube_apiserver_advertise_address: "${{ secrets.HOST_IP }}"
-            kube_apiserver_bind_address: "0.0.0.0"
-            VARS_EOF
+            kube_apiserver_advertise_address: ${{ secrets.HOST_IP }}
+            kube_apiserver_bind_address: 0.0.0.0
+            kubeadm_init_timeout: 600
+            VARS
             
             echo "🔟 ansible-playbook 실행"
             ansible-playbook -i inventory/mycluster/hosts.yaml \
             --become \
-            -e "kube_version=$KUBE_VERSION" \
             cluster.yml
-            kubectl get nodes || echo "kubectl failed"
             echo "🎉 K8s Setup Complete"
             
             # 🔍 Before fix
