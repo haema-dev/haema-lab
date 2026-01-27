@@ -16,8 +16,10 @@ jobs:
       - name: Connect to Tailscale
         uses: tailscale/github-action@v2
         with:
-          authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
+          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
+          oauth-client-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
           version: 1.92.5
+
 
       - name: Setup K8s with Kubespray
         uses: appleboy/ssh-action@master
@@ -97,21 +99,16 @@ jobs:
             sudo usermod -s /bin/bash $(whoami)
             echo "✅ Shell Fixed"
 
-            # User Permisiion
-            cat > /etc/sudoers.d/${{ secrets.USERNAME }} <<'SUDO_EOF'
-            ${{ secrets.USERNAME }} ALL=(ALL) NOPASSWD: /usr/bin/kubectl
-            ${{ secrets.USERNAME }} ALL=(ALL) NOPASSWD: /usr/bin/docker
-            SUDO_EOF
-            chmod 440 /etc/sudoers.d/${{ secrets.USERNAME }}
+            sudo su -
 
-            # SSH Key
-            if [ -f /${{ secrets.FIRST_USERNAME }}/.ssh/authorized_keys ]; then
-              mkdir -p /home/${{ secrets.USERNAME }}/.ssh
-              cp /${{ secrets.FIRST_USERNAME }}/.ssh/authorized_keys /home/${{ secrets.USERNAME }}/.ssh/authorized_keys
-              chmod 700 /home/${{ secrets.USERNAME }}/.ssh
-              chmod 600 /home/${{ secrets.USERNAME }}/.ssh/authorized_keys
-              chown -R ${{ secrets.USERNAME }}:${{ secrets.USERNAME }} /home/${{ secrets.USERNAME }}/.ssh
-            fi
+            # 사용자를 위해 kubeconfig 설정
+            mkdir -p /home/${{ secrets.USERNAME }}/.kube
+            cp /etc/kubernetes/admin.conf /home/${{ secrets.USERNAME }}/.kube/config
+            chown -R ${{ secrets.USERNAME }}:${{ secrets.USERNAME }} /home/${{ secrets.USERNAME }}/.kube
+            chmod 600 /home/${{ secrets.USERNAME }}/.kube/config
+
+            # 확인
+            ls -la /home/${{ secrets.USERNAME }}/.kube/config
             
             echo "✅ User setup complete"
             echo "✅ K8s setup complete"
