@@ -37,64 +37,51 @@ jobs:
             set -e
 
             echo "🔍 Complete cleanup"
-
-            # 포트 해제
+            echo "1️⃣ 포트 해제"
             sudo fuser -k 6443/tcp 2>/dev/null || true
             sudo fuser -k 10259/tcp 2>/dev/null || true
             sudo fuser -k 10257/tcp 2>/dev/null || true
             
-            # kubeadm이 이미 실행됐는지 확인
+            echo "2️⃣ kubeadm 확인"
             if [ -f /etc/kubernetes/manifests/kube-apiserver.yaml ]; then
               echo "✅ Kubernetes already initialized, skipping..."
               exit 0
             fi
             
             echo "🔄 Initializing cluster..."
-            # etcd 완전 정지
+            echo "3️⃣ etcd 정리"
             sudo systemctl stop etcd || true
             sudo systemctl disable etcd || true
+            sudo rm -rf /var/lib/etcd /etc/etcd /etc/ssl/etcd /opt/etcd*
             
-            # etcd 모든 데이터 & 설정 삭제
-            sudo rm -rf /var/lib/etcd
-            sudo rm -rf /etc/etcd
-            sudo rm -rf /etc/ssl/etcd
-            sudo rm -rf /opt/etcd*
-            
-            # kubelet 정리
+            echo "4️⃣ kubelet 정리"
             sudo systemctl stop kubelet || true
             sudo rm -rf /var/lib/kubelet /etc/kubernetes
             
-            # 5초 대기
+            # 🔍 5초 대기
             sleep 5
             
-            echo "🔍 Ready for Kubespray"
-            cd /tmp/kubespray
-            ansible-playbook -i inventory/mycluster/hosts.yaml \
-              --become \
-              cluster.yml
-            
-            echo "🔍 K8s Setup with Kubespray"            
+            echo "5️⃣ K8s Setup with Kubespray"            
             sudo apt-get update
             sudo apt-get install -y python3-pip python3-venv git
             
-            # Create virtual env
+            # 🔍 Create virtual env
             python3 -m venv ~/.venv-kubespray
             source ~/.venv-kubespray/bin/activate
             
+            echo "6️⃣ Kubespray Download"
             cd /tmp
             rm -rf kubespray || true
             git clone https://github.com/kubernetes-sigs/kubespray.git
             cd kubespray
+            git checkout v2.29.0 # ubuntu 24.04 bugfix version
             
-            # ubuntu 24.04 bugfix version
-            git checkout v2.29.0
-            
-            # Install requirements vis Kubespray in virtual env
+            echo "7️⃣ Install requirements vis Kubespray in virtual env"
             pip install -r requirements.txt
             
             cp -rfp inventory/sample inventory/mycluster
             
-            echo "🔍 Before k8s cluster"
+            echo "8️⃣ Before k8s cluster"
             cat > inventory/mycluster/hosts.yaml <<'HOSTS_EOF'
             all:
               hosts:
@@ -129,7 +116,7 @@ jobs:
             kube_apiserver_bind_address: "0.0.0.0"
             VARS_EOF
             
-            echo "🔍 Before ansible-playbook"
+            echo "9️⃣ Before ansible-playbook"
             ansible-playbook -i inventory/mycluster/hosts.yaml \
             --become \
             -e "kube_version=$KUBE_VERSION \
@@ -139,16 +126,16 @@ jobs:
             kubectl get nodes || echo "kubectl failed"
             echo "🎉 K8s Setup Complete"
             
-            echo "🔍 Before fix"
+            # 🔍 Before fix
             sudo usermod -s /bin/bash $(whoami)
             echo "✅ Shell Fixed"
 
-            echo "🔍 Setting up kubeconfig"
+            # 🔍 Setting up kubeconfig
             sudo mkdir -p /home/${{ secrets.USERNAME }}/.kube
             sudo cp /etc/kubernetes/admin.conf /home/${{ secrets.USERNAME }}/.kube/config
             sudo chown -R ${{ secrets.USERNAME }}:${{ secrets.USERNAME }} /home/${{ secrets.USERNAME }}/.kube
             sudo chmod 600 /home/${{ secrets.USERNAME }}/.kube/config
 
-            # Check
+            # 🔍 Check
             sudo ls -la /home/${{ secrets.USERNAME }}/.kube/config
             echo "✅ K8s setup complete"
