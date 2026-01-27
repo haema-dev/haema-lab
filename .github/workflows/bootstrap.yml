@@ -104,102 +104,106 @@ jobs:
             
             echo "🎉 K8s Setup Complete"
 
-      - name: Install ArgoCD
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            #!/bin/bash
-            set -e
-            
-            echo "=== ArgoCD Installation ==="
-            
-            export KUBECONFIG=$HOME/.kube/config
-            
-            kubectl create namespace argocd || true
-            kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-            
-            echo "⏳ Waiting for ArgoCD..."
-            kubectl wait --for=condition=Ready pod -l app.kubernetes.io/part-of=argocd -n argocd --timeout=300s || true
-            
-            echo "=== ArgoCD Status ==="
-            kubectl get pods -n argocd
-            
-            echo ""
-            echo "🔐 === ArgoCD Initial Password ==="
-            kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
-            echo ""
-            
-            echo "🎉 === ArgoCD Installation Complete ==="
+            # Kubespray가 nologin으로 설정한 것 복구
+            sudo usermod -s /bin/bash ${{ secrets.USERNAME }}
 
-      - name: Install Prometheus & Grafana
-        uses: appleboy/ssh-action@master
-        env:
-          GRAFANA_PASSWORD: ${{ secrets.GRAFANA_PASSWORD }}
-        with:
-          host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            #!/bin/bash
-            set -e
+
+      # - name: Install ArgoCD
+      #   uses: appleboy/ssh-action@master
+      #   with:
+      #     host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
+      #     username: ${{ secrets.USERNAME }}
+      #     key: ${{ secrets.SSH_PRIVATE_KEY }}
+      #     script: |
+      #       #!/bin/bash
+      #       set -e
             
-            echo "=== Prometheus & Grafana Installation ==="
+      #       echo "=== ArgoCD Installation ==="
             
-            export KUBECONFIG=$HOME/.kube/config
+      #       export KUBECONFIG=$HOME/.kube/config
             
-            # 1. Prometheus 네임스페이스
-            kubectl create namespace prometheus || true
+      #       kubectl create namespace argocd || true
+      #       kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
             
-            # 2. Helm 설치 (없으면)
-            if ! command -v helm &> /dev/null; then
-              curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-            fi
+      #       echo "⏳ Waiting for ArgoCD..."
+      #       kubectl wait --for=condition=Ready pod -l app.kubernetes.io/part-of=argocd -n argocd --timeout=300s || true
             
-            # 3. Prometheus 설치 (Helm)
-            helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-            helm repo update
+      #       echo "=== ArgoCD Status ==="
+      #       kubectl get pods -n argocd
             
-            helm install prometheus prometheus-community/prometheus \
-              -n prometheus \
-              --set prometheus.prometheusSpec.retention=15d \
-              --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage=10Gi \
-              || echo "Prometheus already installed"
+      #       echo ""
+      #       echo "🔐 === ArgoCD Initial Password ==="
+      #       kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+      #       echo ""
             
-            # 4. Grafana 설치 (Helm)
-            helm repo add grafana https://grafana.github.io/helm-charts
-            helm repo update
+      #       echo "🎉 === ArgoCD Installation Complete ==="
+
+      # - name: Install Prometheus & Grafana
+      #   uses: appleboy/ssh-action@master
+      #   env:
+      #     GRAFANA_PASSWORD: ${{ secrets.GRAFANA_PASSWORD }}
+      #   with:
+      #     host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
+      #     username: ${{ secrets.USERNAME }}
+      #     key: ${{ secrets.SSH_PRIVATE_KEY }}
+      #     script: |
+      #       #!/bin/bash
+      #       set -e
             
-            kubectl create namespace grafana || true
+      #       echo "=== Prometheus & Grafana Installation ==="
             
-            helm install grafana grafana/grafana \
-              -n grafana \
-              --set adminPassword=$GRAFANA_PASSWORD \
-              --set persistence.enabled=true \
-              --set persistence.size=5Gi \
-              || echo "Grafana already installed"
+      #       export KUBECONFIG=$HOME/.kube/config
             
-            echo "⏳ Waiting for Prometheus & Grafana..."
-            kubectl wait --for=condition=Ready pod -n prometheus --all --timeout=300s || true
-            kubectl wait --for=condition=Ready pod -n grafana --all --timeout=300s || true
+      #       # 1. Prometheus 네임스페이스
+      #       kubectl create namespace prometheus || true
             
-            echo "=== Services Status ==="
-            echo ""
-            echo "Prometheus:"
-            kubectl get svc -n prometheus
-            echo ""
-            echo "Grafana:"
-            kubectl get svc -n grafana
+      #       # 2. Helm 설치 (없으면)
+      #       if ! command -v helm &> /dev/null; then
+      #         curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      #       fi
             
-            echo ""
-            echo "📊 === Grafana Access ==="
-            echo "Service: kubectl port-forward svc/grafana -n grafana 3000:80"
-            echo ""
+      #       # 3. Prometheus 설치 (Helm)
+      #       helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      #       helm repo update
             
-            echo "📈 === Prometheus Access ==="
-            echo "Service: kubectl port-forward svc/prometheus-server -n prometheus 9090:80"
-            echo ""
+      #       helm install prometheus prometheus-community/prometheus \
+      #         -n prometheus \
+      #         --set prometheus.prometheusSpec.retention=15d \
+      #         --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage=10Gi \
+      #         || echo "Prometheus already installed"
             
-            echo "🎉 === Monitoring Setup Complete ==="
+      #       # 4. Grafana 설치 (Helm)
+      #       helm repo add grafana https://grafana.github.io/helm-charts
+      #       helm repo update
+            
+      #       kubectl create namespace grafana || true
+            
+      #       helm install grafana grafana/grafana \
+      #         -n grafana \
+      #         --set adminPassword=$GRAFANA_PASSWORD \
+      #         --set persistence.enabled=true \
+      #         --set persistence.size=5Gi \
+      #         || echo "Grafana already installed"
+            
+      #       echo "⏳ Waiting for Prometheus & Grafana..."
+      #       kubectl wait --for=condition=Ready pod -n prometheus --all --timeout=300s || true
+      #       kubectl wait --for=condition=Ready pod -n grafana --all --timeout=300s || true
+            
+      #       echo "=== Services Status ==="
+      #       echo ""
+      #       echo "Prometheus:"
+      #       kubectl get svc -n prometheus
+      #       echo ""
+      #       echo "Grafana:"
+      #       kubectl get svc -n grafana
+            
+      #       echo ""
+      #       echo "📊 === Grafana Access ==="
+      #       echo "Service: kubectl port-forward svc/grafana -n grafana 3000:80"
+      #       echo ""
+            
+      #       echo "📈 === Prometheus Access ==="
+      #       echo "Service: kubectl port-forward svc/prometheus-server -n prometheus 9090:80"
+      #       echo ""
+            
+      #       echo "🎉 === Monitoring Setup Complete ==="
