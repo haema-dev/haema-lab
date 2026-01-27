@@ -181,7 +181,7 @@ jobs:
               hosts:
                 $USERNAME:
                   ansible_connection: local
-                  ansible_host: 127.0.0.1
+                  ansible_host: $HOST_IP
                   ip: $HOST_IP
                   access_ip: $HOST_IP
               children:
@@ -199,8 +199,7 @@ jobs:
                     kube_control_plane:
                     kube_node:
             HOSTS
-            
-            # hosts.yaml에서 변수 치환
+
             sed -i "s|\$USERNAME|$USERNAME|g" "$INVENTORY_DIR/hosts.yaml"
             sed -i "s|\$HOST_IP|$HOST_IP|g" "$INVENTORY_DIR/hosts.yaml"
             
