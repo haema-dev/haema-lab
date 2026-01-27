@@ -32,6 +32,8 @@ jobs:
           script: |
             #!/bin/bash
             set -e
+
+            kubeadm reset -f || true
             
             echo "=== K8s Setup with Kubespray ==="
             
@@ -58,7 +60,7 @@ jobs:
             cat > inventory/mycluster/hosts.yaml <<'EOF'
             all:
               hosts:
-                node1:
+                ${{ secrets.USERNAME }}:
                   ansible_connection: local
                   ansible_host: 127.0.0.1       # localhost (Ansible이 로컬에서 실행)
                   ip: ${{ secrets.HOST_IP }}
@@ -66,13 +68,13 @@ jobs:
               children:
                 kube_control_plane:
                   hosts:
-                    node1:
+                    ${{ secrets.USERNAME }}:
                 kube_node:
                   hosts:
-                    node1:
+                    ${{ secrets.USERNAME }}:
                 etcd:
                   hosts:
-                    node1:
+                    ${{ secrets.USERNAME }}:
                 k8s_cluster:
                   children:
                     kube_control_plane:
