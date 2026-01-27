@@ -25,6 +25,8 @@ jobs:
 
       - name: Setup K8s with Kubespray
         uses: appleboy/ssh-action@master
+        env:
+          KUBE_VERSION": "1.31.6"
         with:
           host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
           username: ${{ secrets.FIRST_USERNAME }}
@@ -33,7 +35,22 @@ jobs:
             #!/bin/bash
             set -e
 
-            kubeadm reset -f || true
+            echo "=== Complete cleanup ==="
+            
+            # 포트 강제 해제
+            sudo fuser -k 6443/tcp 2>/dev/null || true
+            sudo fuser -k 10259/tcp 2>/dev/null || true
+            sudo fuser -k 10257/tcp 2>/dev/null || true
+
+            # kubeadm reset
+            sudo kubeadm reset -f --cri-socket=/run/containerd/containerd.sock || true
+
+            # etcd 정리
+            sudo rm -rf /var/lib/etcd/*
+            sudo systemctl restart etcd || true
+            
+            # sleep으로 안정화
+            sleep 5
             
             echo "=== K8s Setup with Kubespray ==="            
             sudo apt-get update
@@ -82,7 +99,7 @@ jobs:
             HOSTS_EOF
             
             cat > inventory/mycluster/group_vars/all/all.yml <<'VARS_EOF'
-            kube_version: "1.31.6"  # v2.28.1에서 지원하는 LTS 버전
+            kube_version: $KUBE_VERSION
             container_manager: containerd
             dns_mode: coredns
             kube_pods_subnet: 10.244.0.0/16
@@ -93,8 +110,11 @@ jobs:
             
             echo "🔍 Before ansible-playbook"
             ansible-playbook -i inventory/mycluster/hosts.yaml \
-              --become \
-              cluster.yml
+            --become \
+            -e "kube_version=$KUBE_VERSION" \
+            -e "ansible_timeout=300" \
+            -e "ansible_connection_timeout=60" \
+            cluster.yml
             kubectl get nodes || echo "kubectl failed"
             echo "🎉 K8s Setup Complete"
             
