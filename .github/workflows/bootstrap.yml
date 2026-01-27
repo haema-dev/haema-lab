@@ -57,12 +57,12 @@ jobs:
             
             cp -rfp inventory/sample inventory/mycluster
             
-            cat > inventory/mycluster/hosts.yaml <<'EOF'
+            cat > inventory/mycluster/hosts.yaml <<'HOSTS_EOF'
             all:
               hosts:
                 ${{ secrets.USERNAME }}:
                   ansible_connection: local
-                  ansible_host: 127.0.0.1       # localhost (Ansible이 로컬에서 실행)
+                  ansible_host: 127.0.0.1
                   ip: ${{ secrets.HOST_IP }}
                   access_ip: ${{ secrets.HOST_IP }}
               children:
@@ -79,19 +79,16 @@ jobs:
                   children:
                     kube_control_plane:
                     kube_node:
-            EOF
+            HOSTS_EOF
             
-            cat > inventory/mycluster/group_vars/all/all.yml <<'EOF'
+            cat > inventory/mycluster/group_vars/all/all.yml <<'VARS_EOF'
             kube_version: "1.31.6"  # v2.28.1에서 지원하는 LTS 버전
             container_manager: containerd
             dns_mode: coredns
             kube_pods_subnet: 10.244.0.0/16
             kube_service_addresses: 10.96.0.0/12
-            
-            # 추가: API Server 설정 명시
-            kube_apiserver_advertise_address: "{{ hostvars[groups['kube_control_plane'][0]]['ansible_default_ipv4']['address'] }}"
-            kube_apiserver_bind_address: 0.0.0.0
-
+            kube_apiserver_advertise_address: "${{ secrets.HOST_IP }}"
+            kube_apiserver_bind_address: "0.0.0.0"
             VARS_EOF
             
             echo "🔍 Before ansible-playbook"
@@ -119,5 +116,4 @@ jobs:
             # 확인
             ls -la /home/${{ secrets.USERNAME }}/.kube/config
             
-            echo "✅ User setup complete"
             echo "✅ K8s setup complete"
