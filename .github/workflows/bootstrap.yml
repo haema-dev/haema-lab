@@ -1,4 +1,4 @@
-name: Kubespray K8s
+name: Kubespray K8s - Idempotent
 
 on:
   workflow_dispatch:
@@ -6,10 +6,12 @@ on:
     branches: [ master ]
     paths:
       - '.github/workflows/bootstrap.yml'
+      - 'k8s-config/**'
 
 jobs:
   setup:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v3
@@ -19,92 +21,162 @@ jobs:
         with:
           version: 1.94.1
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
-          # oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
-          # oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
-          # tags: ${{ secrets.TAILSCALE_AUTH_TAGS }}
 
-
-      - name: Setup K8s with Kubespray
+      - name: Setup K8s with Kubespray (Idempotent)
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
           username: ${{ secrets.FIRST_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script_stop_on_error: true
           script: |
-            KUBE_VERSION="1.31.6"
-            echo $KUBE_VERSION
-            #!/bin/bash
             set -e
 
-            echo "🔍 Complete cleanup"
-            echo "1️⃣ 프로세스 강제 종료 및 포트 해제"
-            pkill -9 kube-apiserver 2>/dev/null || true
-            pkill -9 kube-controller-manager 2>/dev/null || true
-            pkill -9 kube-scheduler 2>/dev/null || true
-            pkill -9 kubelet 2>/dev/null || true
-            pkill -9 etcd 2>/dev/null || true
-            sleep 2
-            fuser -k 6443/tcp 2>/dev/null || true
-            fuser -k 10259/tcp 2>/dev/null || true
-            fuser -k 10257/tcp 2>/dev/null || true
-            fuser -k 10250/tcp 2>/dev/null || true
-            fuser -k 2379/tcp 2>/dev/null || true
-            fuser -k 2380/tcp 2>/dev/null || true
+            # 포트 점유 확인
+            echo "🔍 Checking port occupation..."
+            OCCUPIED_PORTS=""
+            for port in 6443 2379 10250; do
+              if sudo lsof -Pi ":$port" -sTCP:LISTEN -t >/dev/null 2>&1; then
+                OCCUPIED_PORTS="$OCCUPIED_PORTS $port"
+              fi
+            done
             
-            echo "2️⃣ kubeadm 확인"
-            if [ -f /etc/kubernetes/manifests/kube-apiserver.yaml ]; then
-              echo "✅ Kubernetes already initialized"
+            if [ ! -z "$OCCUPIED_PORTS" ]; then
+              echo "⚠️ Ports occupied:$OCCUPIED_PORTS"
+              echo "🧹 Force cleaning..."
+              sudo systemctl stop kubelet etcd 2>/dev/null || true
+              for port in $OCCUPIED_PORTS; do
+                sudo fuser -k "$port/tcp" 2>/dev/null || true
+              done
+              sleep 3
+            else
+              echo "✅ All ports free"
+            fi
+
+            set -euo pipefail
+            
+            KUBE_VERSION="1.31.6"
+            KUBESPRAY_VERSION="v2.29.0"
+            KUBESPRAY_HOME="/opt/kubespray"
+            VENV_PATH="/opt/venv-kubespray"
+            
+            echo "════════════════════════════════════"
+            echo "🔄 Kubespray Idempotent Setup"
+            echo "Kubernetes: $KUBE_VERSION"
+            echo "Kubespray: $KUBESPRAY_VERSION"
+            echo "════════════════════════════════════"
+            
+            # ============================================
+            # 1️⃣ 상태 체크: 이미 완성된 클러스터인가?
+            # ============================================
+            check_cluster_health() {
+              if ! command -v kubectl &> /dev/null; then
+                return 1
+              fi
+              
+              if ! kubectl cluster-info &>/dev/null; then
+                return 1
+              fi
+              
+              # 모든 노드가 Ready 상태인가?
+              READY_NODES=$(kubectl get nodes --no-headers 2>/dev/null | grep -c " Ready " || echo 0)
+              TOTAL_NODES=$(kubectl get nodes --no-headers 2>/dev/null | wc -l || echo 0)
+              
+              if [ "$READY_NODES" -eq "$TOTAL_NODES" ] && [ "$TOTAL_NODES" -gt 0 ]; then
+                return 0
+              fi
+              return 1
+            }
+            
+            if check_cluster_health; then
+              echo "✅ Kubernetes cluster is healthy"
+              echo "   $(kubectl version --short 2>/dev/null || echo 'kubectl available')"
+              echo "   Nodes: $(kubectl get nodes -o jsonpath='{.items[*].metadata.name}' 2>/dev/null)"
               exit 0
             fi
             
-            echo "3️⃣ etcd 정리"
-            systemctl stop etcd 2>/dev/null || true
-            systemctl disable etcd 2>/dev/null || true
-            rm -rf /var/lib/etcd /etc/etcd /etc/ssl/etcd /opt/etcd* 2>/dev/null || true
+            echo "⚠️  Cluster health check failed or cluster not initialized"
+            echo "   Proceeding with Kubespray..."
             
-            echo "4️⃣ kubelet 및 container 정리"
-            systemctl stop kubelet 2>/dev/null || true
-            systemctl stop kube-* 2>/dev/null || true
-            rm -rf /var/lib/kubelet /etc/kubernetes /etc/cni /opt/cni 2>/dev/null || true
-            rm -rf /var/run/kubernetes 2>/dev/null || true
-            crictl rm -a 2>/dev/null || true
-            crictl rmi --prune 2>/dev/null || true
-            ctr image rm -f 2>/dev/null || true
+            # ============================================
+            # 2️⃣ 환경 준비 (멱등성: 이미 있으면 스킵)
+            # ============================================
+            echo ""
+            echo "📦 Installing dependencies..."
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq \
+              python3-pip python3-venv git jq curl \
+              2>&1 | grep -v "^Processing triggers\|^done\.$" || true
             
-            # 🔍 5초 대기
-            sleep 5
+            # ============================================
+            # 3️⃣ Kubespray 준비 (멱등성 구현)
+            # ============================================
+            echo ""
+            echo "📥 Setting up Kubespray..."
             
-            echo "5️⃣ K8s Setup with Kubespray"            
-            apt-get update -qq
-            apt-get install -y -qq python3-pip python3-venv git
+            # 이미 존재하고 올바른 버전이면 스킵
+            if [ -d "$KUBESPRAY_HOME/.git" ]; then
+              CURRENT_VERSION=$(cd "$KUBESPRAY_HOME" && git describe --tags 2>/dev/null || echo "unknown")
+              if [ "$CURRENT_VERSION" = "$KUBESPRAY_VERSION" ]; then
+                echo "   ✅ Kubespray $KUBESPRAY_VERSION already cloned"
+              else
+                echo "   🔄 Updating Kubespray from $CURRENT_VERSION to $KUBESPRAY_VERSION"
+                cd "$KUBESPRAY_HOME"
+                git fetch origin
+                git checkout "$KUBESPRAY_VERSION"
+              fi
+            else
+              echo "   📥 Cloning Kubespray..."
+              sudo rm -rf "$KUBESPRAY_HOME"
+              sudo mkdir -p "$KUBESPRAY_HOME"
+              git clone --depth 1 --branch "$KUBESPRAY_VERSION" \
+                https://github.com/kubernetes-sigs/kubespray.git "$KUBESPRAY_HOME"
+              sudo chown -R "$USER:$USER" "$KUBESPRAY_HOME"
+            fi
             
-            # 🔍 Create virtual env
-            python3 -m venv ~/.venv-kubespray
-            source ~/.venv-kubespray/bin/activate
+            # ============================================
+            # 4️⃣ Python 가상환경 (멱등성: 이미 있으면 재사용)
+            # ============================================
+            echo ""
+            echo "🐍 Setting up Python environment..."
             
-            echo "6️⃣ Kubespray Download"
-            cd /tmp
-            rm -rf kubespray || true
-            git clone https://github.com/kubernetes-sigs/kubespray.git
-            cd kubespray
-            # 🔍 ubuntu 24.04 bugfix version
-            git checkout v2.29.0
+            if [ ! -d "$VENV_PATH" ]; then
+              python3 -m venv "$VENV_PATH"
+              echo "   ✅ Created virtual environment"
+            else
+              echo "   ✅ Using existing virtual environment"
+            fi
             
-            echo "7️⃣ Install requirements vis Kubespray in virtual env"
-            pip install -r requirements.txt
+            source "$VENV_PATH/bin/activate"
+            pip install -q --upgrade pip
+            pip install -q -r "$KUBESPRAY_HOME/requirements.txt"
             
-            cp -rfp inventory/sample inventory/mycluster
-            mkdir -p inventory/mycluster/group_vars/all
+            # ============================================
+            # 5️⃣ Ansible 인벤토리 설정
+            # ============================================
+            echo ""
+            echo "📋 Configuring Ansible inventory..."
             
-            echo "8️⃣ Before k8s cluster"
-            tee inventory/mycluster/hosts.yaml > /dev/null <<'HOSTS'
+            INVENTORY_DIR="$KUBESPRAY_HOME/inventory/mycluster"
+            
+            # 이미 있으면 백업
+            if [ -d "$INVENTORY_DIR" ]; then
+              BACKUP_DIR="$KUBESPRAY_HOME/inventory/mycluster.backup.$(date +%s)"
+              cp -r "$INVENTORY_DIR" "$BACKUP_DIR"
+              echo "   ✅ Backed up existing inventory to $BACKUP_DIR"
+            fi
+            
+            mkdir -p "$INVENTORY_DIR/group_vars/all"
+            
+            # hosts.yaml 생성 (멱등성: 내용이 같으면 덮어쓰기 OK)
+            cat > "$INVENTORY_DIR/hosts.yaml" <<'HOSTS'
             all:
               hosts:
                 ${{ secrets.USERNAME }}:
                   ansible_connection: local
                   ansible_host: 127.0.0.1
-                  ip: ${{ secrets.HOST_IP }}
-                  access_ip: ${{ secrets.HOST_IP }}
+                  ip: "{{ ansible_host }}"
+                  access_ip: "{{ ansible_host }}"
               children:
                 kube_control_plane:
                   hosts:
@@ -121,34 +193,100 @@ jobs:
                     kube_node:
             HOSTS
             
-            echo "9️⃣ group_vars/all/all.yml"
-            tee inventory/mycluster/group_vars/all/all.yml > /dev/null <<'VARS'
-            kube_version: $KUBE_VERSION
+            # all.yml 생성 (멱등성: 변경사항만 적용)
+            cat > "$INVENTORY_DIR/group_vars/all/all.yml" <<'VARS'
+            ---
+            # Kubernetes
+            kube_version: 1.31.6
             container_manager: containerd
             dns_mode: coredns
+            
+            # Network
             kube_pods_subnet: 10.244.0.0/16
             kube_service_addresses: 10.96.0.0/12
-            kube_apiserver_advertise_address: ${{ secrets.HOST_IP }}
-            kube_apiserver_bind_address: 0.0.0.0
+            kube_apiserver_advertise_address: "127.0.0.1"
+            kube_apiserver_bind_address: "0.0.0.0"
+            
+            # Kubelet
+            kubelet_deployment_type: host
+            
+            # Timeouts
             kubeadm_init_timeout: 600
+            upgrade_cluster_setup_timeout: 600
+            
+            # Skip unnecessary checks for single-node
+            skip_kubelet_systemd_environment_file_checks: true
             VARS
             
-            echo "🔟 ansible-playbook 실행"
-            ansible-playbook -i inventory/mycluster/hosts.yaml \
-            --become \
-            cluster.yml
-            echo "🎉 K8s Setup Complete"
+            echo "   ✅ Inventory configured"
             
-            # 🔍 Before fix
-            sudo usermod -s /bin/bash $(whoami)
-            echo "✅ Shell Fixed"
-
-            # 🔍 Setting up kubeconfig
-            sudo mkdir -p /home/${{ secrets.USERNAME }}/.kube
-            sudo cp /etc/kubernetes/admin.conf /home/${{ secrets.USERNAME }}/.kube/config
-            sudo chown -R ${{ secrets.USERNAME }}:${{ secrets.USERNAME }} /home/${{ secrets.USERNAME }}/.kube
-            sudo chmod 600 /home/${{ secrets.USERNAME }}/.kube/config
-
-            # 🔍 Check
-            sudo ls -la /home/${{ secrets.USERNAME }}/.kube/config
-            echo "✅ K8s setup complete"
+            # ============================================
+            # 6️⃣ Kubespray 실행 (멱등성 핵심)
+            # ============================================
+            echo ""
+            echo "🚀 Running Kubespray (idempotent)..."
+            echo "   This may take 15-20 minutes..."
+            
+            cd "$KUBESPRAY_HOME"
+            
+            # Kubespray는 멱등성을 위해 설계됨
+            # 이미 초기화된 부분은 스킵하고 필요한 부분만 업데이트
+            ansible-playbook \
+              -i "$INVENTORY_DIR/hosts.yaml" \
+              --become \
+              --become-method=sudo \
+              -v \
+              cluster.yml
+            
+            if [ $? -ne 0 ]; then
+              echo "❌ Kubespray failed"
+              exit 1
+            fi
+            
+            echo "✅ Kubespray completed"
+            
+            # ============================================
+            # 7️⃣ kubeconfig 설정 (멱등성: 이미 있으면 스킵)
+            # ============================================
+            echo ""
+            echo "🔑 Setting up kubeconfig..."
+            
+            KUBECONFIG_PATH="/home/${{ secrets.FIRST_USERNAME }}/.kube/config"
+            
+            if [ ! -f "$KUBECONFIG_PATH" ]; then
+              mkdir -p "$(dirname "$KUBECONFIG_PATH")"
+              sudo cp /etc/kubernetes/admin.conf "$KUBECONFIG_PATH"
+              sudo chown "${{ secrets.FIRST_USERNAME }}:${{ secrets.FIRST_USERNAME }}" "$KUBECONFIG_PATH"
+              sudo chmod 600 "$KUBECONFIG_PATH"
+              echo "   ✅ Created kubeconfig"
+            else
+              echo "   ✅ kubeconfig already exists"
+            fi
+            
+            # ============================================
+            # 8️⃣ 최종 검증
+            # ============================================
+            echo ""
+            echo "✓ Verifying cluster..."
+            
+            export KUBECONFIG="$KUBECONFIG_PATH"
+            
+            # kubectl 설정 확인
+            if ! kubectl cluster-info &>/dev/null; then
+              echo "❌ Cluster info check failed"
+              exit 1
+            fi
+            
+            # 노드 상태 확인
+            echo "   Nodes:"
+            kubectl get nodes -o wide
+            
+            # 주요 포드 확인
+            echo ""
+            echo "   System pods:"
+            kubectl get pods -n kube-system --no-headers | head -5
+            
+            echo ""
+            echo "════════════════════════════════════"
+            echo "🎉 Kubernetes setup complete!"
+            echo "════════════════════════════════════"
