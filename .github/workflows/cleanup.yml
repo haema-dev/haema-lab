@@ -1,0 +1,128 @@
+name: Cleanup K8s Only
+
+
+on:
+  workflow_dispatch:
+
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          version: 1.94.1
+          authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
+
+
+      - name: 🧹 Complete Cleanup (Remove All K8s)
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
+          username: ${{ secrets.FIRST_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            
+            echo "════════════════════════════════════"
+            echo "🧹 COMPLETE CLEANUP"
+            echo "════════════════════════════════════"
+            
+            # 1️⃣ 서비스 중지
+            echo ""
+            echo "🛑 Stopping services..."
+            sudo systemctl stop kubelet kube-apiserver kube-controller-manager kube-scheduler etcd docker containerd 2>/dev/null || true
+            sudo systemctl disable kubelet kube-apiserver kube-controller-manager kube-scheduler etcd docker containerd 2>/dev/null || true
+            sleep 3
+            
+            # 2️⃣ 포트 강제 해제
+            echo ""
+            echo "🔓 Releasing ports..."
+            for port in 6443 2379 2380 10250 10259 10257 10251 10252 9099 6783 6784; do
+              sudo fuser -k "$port/tcp" 2>/dev/null || true
+              sudo fuser -k "$port/udp" 2>/dev/null || true
+            done
+            
+            # 3️⃣ 프로세스 강제 종료
+            echo ""
+            echo "💀 Force killing processes..."
+            sudo pkill -9 kube-apiserver 2>/dev/null || true
+            sudo pkill -9 kube-controller-manager 2>/dev/null || true
+            sudo pkill -9 kube-scheduler 2>/dev/null || true
+            sudo pkill -9 kubelet 2>/dev/null || true
+            sudo pkill -9 etcd 2>/dev/null || true
+            sudo pkill -9 containerd 2>/dev/null || true
+            sleep 3
+            
+            # 4️⃣ Kubernetes 디렉토리 전부 삭제
+            echo ""
+            echo "🗑️  Removing Kubernetes directories..."
+            sudo rm -rf /etc/kubernetes
+            sudo rm -rf /var/lib/kubelet
+            sudo rm -rf /var/lib/etcd
+            sudo rm -rf /etc/etcd
+            sudo rm -rf /etc/ssl/etcd
+            sudo rm -rf /opt/etcd*
+            sudo rm -rf /opt/cni
+            sudo rm -rf /var/run/kubernetes
+            sudo rm -rf /etc/cni/net.d
+            
+            # 5️⃣ Kubespray 삭제 (새로 받기 위해)
+            echo ""
+            echo "🗑️  Removing Kubespray..."
+            sudo rm -rf /opt/kubespray
+            sudo rm -rf /opt/venv-kubespray
+            
+            # 6️⃣ CNI 네트워크 인터페이스 정리
+            echo ""
+            echo "🌐 Cleaning CNI interfaces..."
+            for iface in cni0 flannel.1 weave datapath br-* veth*; do
+              sudo ip link delete "$iface" 2>/dev/null || true
+            done
+            
+            # 7️⃣ containerd 정리
+            echo ""
+            echo "🐳 Cleaning containerd..."
+            if command -v crictl &> /dev/null; then
+              sudo crictl rm -a 2>/dev/null || true
+              sudo crictl rmi --prune 2>/dev/null || true
+            fi
+            
+            if command -v ctr &> /dev/null; then
+              sudo ctr c rm -f $(sudo ctr c list -q 2>/dev/null) 2>/dev/null || true
+              sudo ctr i rm -f $(sudo ctr i list -q 2>/dev/null) 2>/dev/null || true
+            fi
+            
+            sudo rm -rf /var/lib/containerd 2>/dev/null || true
+            
+            # 8️⃣ iptables 초기화
+            echo ""
+            echo "🔧 Resetting iptables..."
+            sudo iptables -F 2>/dev/null || true
+            sudo iptables -X 2>/dev/null || true
+            sudo iptables -t nat -F 2>/dev/null || true
+            sudo iptables -t nat -X 2>/dev/null || true
+            
+            # 9️⃣ IP forwarding 활성화
+            echo ""
+            echo "📡 Enabling IP forwarding..."
+            sudo sysctl -w net.ipv4.ip_forward=1 > /dev/null
+            
+            # 🔟 메모리 정리
+            echo ""
+            echo "💾 Freeing memory..."
+            sync
+            echo 3 | sudo tee /proc/sys/vm/drop_caches > /dev/null
+            
+            echo ""
+            echo "════════════════════════════════════"
+            echo "✅ Cleanup complete!"
+            echo "════════════════════════════════════"
+            echo ""
+            echo "System ready for fresh K8s installation"
