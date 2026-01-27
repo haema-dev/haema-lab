@@ -35,8 +35,7 @@ jobs:
 
             kubeadm reset -f || true
             
-            echo "=== K8s Setup with Kubespray ==="
-            
+            echo "=== K8s Setup with Kubespray ==="            
             sudo apt-get update
             sudo apt-get install -y python3-pip python3-venv git
             
@@ -115,5 +114,4 @@ jobs:
 
             # 확인
             ls -la /home/${{ secrets.USERNAME }}/.kube/config
-            
             echo "✅ K8s setup complete"
