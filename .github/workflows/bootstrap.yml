@@ -1,4 +1,4 @@
-name: Kubespray K8s - Idempotent (Your Structure)
+name: Kubespray K8s
 
 on:
   workflow_dispatch:
@@ -6,12 +6,11 @@ on:
     branches: [ master ]
     paths:
       - '.github/workflows/bootstrap.yml'
-      - 'k8s-config/**'
 
 jobs:
   setup:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 12
 
     steps:
       - uses: actions/checkout@v3
@@ -51,7 +50,7 @@ jobs:
               echo "✅ All ports free"
             fi
 
-      - name: Setup K8s with Kubespray (Idempotent)
+      - name: Setup K8s with Kubespray
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
