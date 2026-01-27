@@ -1,4 +1,4 @@
-name: Bootstrap K8s & ArgoCD & Monitoring
+name: Bootstrap K8s # & ArgoCD & Monitoring
 
 on:
   workflow_dispatch:
@@ -17,13 +17,13 @@ jobs:
         uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
+          version: latest
 
       - name: Setup K8s with Kubespray
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
-          username: ${{ secrets.USERNAME }}
-          password: ${{ secrets.PASSWORD }}
+          username: ${{ secrets.FIRST_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             #!/bin/bash
@@ -57,8 +57,8 @@ jobs:
                 node1:
                   ansible_connection: local
                   ansible_host: 127.0.0.1       # localhost (Ansible이 로컬에서 실행)
-                  ip: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
-                  access_ip: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
+                  ip: ${{ secrets.HOST_IP }}
+                  access_ip: ${{ secrets.HOST_IP }}
               children:
                 kube_control_plane:
                   hosts:
@@ -85,10 +85,10 @@ jobs:
             
             echo "🔍 Before ansible-playbook"
             ansible-playbook -i inventory/mycluster/hosts.yaml \
-              --become --become-user=root \
+              --become \
               cluster.yml
             
-            echo "🔍 After ansible-playbook (여기까지 오나?)"
+            echo "🔍 After ansible-playbook"
             
             kubectl get nodes || echo "kubectl failed"
             echo "🎉 K8s Setup Complete"
@@ -97,117 +97,21 @@ jobs:
             sudo usermod -s /bin/bash $(whoami)
             echo "✅ Shell Fixed"
 
+            # User Permisiion
+            cat > /etc/sudoers.d/${{ secrets.USERNAME }} <<'SUDO_EOF'
+            ${{ secrets.USERNAME }} ALL=(ALL) NOPASSWD: /usr/bin/kubectl
+            ${{ secrets.USERNAME }} ALL=(ALL) NOPASSWD: /usr/bin/docker
+            SUDO_EOF
+            chmod 440 /etc/sudoers.d/${{ secrets.USERNAME }}
 
-      # - name: Fix Shell Access
-      #   uses: appleboy/ssh-action@master
-      #   with:
-      #     host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
-      #     username: ${{ secrets.USERNAME }}
-      #     key: ${{ secrets.SSH_PRIVATE_KEY }}
-      #     script: |
-      #       #!/bin/bash
-      #       set -e
+            # SSH Key
+            if [ -f /${{ secrets.FIRST_USERNAME }}/.ssh/authorized_keys ]; then
+              mkdir -p /home/${{ secrets.USERNAME }}/.ssh
+              cp /${{ secrets.FIRST_USERNAME }}/.ssh/authorized_keys /home/${{ secrets.USERNAME }}/.ssh/authorized_keys
+              chmod 700 /home/${{ secrets.USERNAME }}/.ssh
+              chmod 600 /home/${{ secrets.USERNAME }}/.ssh/authorized_keys
+              chown -R ${{ secrets.USERNAME }}:${{ secrets.USERNAME }} /home/${{ secrets.USERNAME }}/.ssh
+            fi
             
-      #       sudo usermod -s /bin/bash kube
-      #       echo "✅ Shell Access Restored"
-
-
-      # - name: Install ArgoCD
-      #   uses: appleboy/ssh-action@master
-      #   with:
-      #     host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
-      #     username: ${{ secrets.USERNAME }}
-      #     key: ${{ secrets.SSH_PRIVATE_KEY }}
-      #     script: |
-      #       #!/bin/bash
-      #       set -e
-            
-      #       echo "=== ArgoCD Installation ==="
-            
-      #       export KUBECONFIG=$HOME/.kube/config
-            
-      #       kubectl create namespace argocd || true
-      #       kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-            
-      #       echo "⏳ Waiting for ArgoCD..."
-      #       kubectl wait --for=condition=Ready pod -l app.kubernetes.io/part-of=argocd -n argocd --timeout=300s || true
-            
-      #       echo "=== ArgoCD Status ==="
-      #       kubectl get pods -n argocd
-            
-      #       echo ""
-      #       echo "🔐 === ArgoCD Initial Password ==="
-      #       kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
-      #       echo ""
-            
-      #       echo "🎉 === ArgoCD Installation Complete ==="
-
-      # - name: Install Prometheus & Grafana
-      #   uses: appleboy/ssh-action@master
-      #   env:
-      #     GRAFANA_PASSWORD: ${{ secrets.GRAFANA_PASSWORD }}
-      #   with:
-      #     host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
-      #     username: ${{ secrets.USERNAME }}
-      #     key: ${{ secrets.SSH_PRIVATE_KEY }}
-      #     script: |
-      #       #!/bin/bash
-      #       set -e
-            
-      #       echo "=== Prometheus & Grafana Installation ==="
-            
-      #       export KUBECONFIG=$HOME/.kube/config
-            
-      #       # 1. Prometheus 네임스페이스
-      #       kubectl create namespace prometheus || true
-            
-      #       # 2. Helm 설치 (없으면)
-      #       if ! command -v helm &> /dev/null; then
-      #         curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-      #       fi
-            
-      #       # 3. Prometheus 설치 (Helm)
-      #       helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-      #       helm repo update
-            
-      #       helm install prometheus prometheus-community/prometheus \
-      #         -n prometheus \
-      #         --set prometheus.prometheusSpec.retention=15d \
-      #         --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage=10Gi \
-      #         || echo "Prometheus already installed"
-            
-      #       # 4. Grafana 설치 (Helm)
-      #       helm repo add grafana https://grafana.github.io/helm-charts
-      #       helm repo update
-            
-      #       kubectl create namespace grafana || true
-            
-      #       helm install grafana grafana/grafana \
-      #         -n grafana \
-      #         --set adminPassword=$GRAFANA_PASSWORD \
-      #         --set persistence.enabled=true \
-      #         --set persistence.size=5Gi \
-      #         || echo "Grafana already installed"
-            
-      #       echo "⏳ Waiting for Prometheus & Grafana..."
-      #       kubectl wait --for=condition=Ready pod -n prometheus --all --timeout=300s || true
-      #       kubectl wait --for=condition=Ready pod -n grafana --all --timeout=300s || true
-            
-      #       echo "=== Services Status ==="
-      #       echo ""
-      #       echo "Prometheus:"
-      #       kubectl get svc -n prometheus
-      #       echo ""
-      #       echo "Grafana:"
-      #       kubectl get svc -n grafana
-            
-      #       echo ""
-      #       echo "📊 === Grafana Access ==="
-      #       echo "Service: kubectl port-forward svc/grafana -n grafana 3000:80"
-      #       echo ""
-            
-      #       echo "📈 === Prometheus Access ==="
-      #       echo "Service: kubectl port-forward svc/prometheus-server -n prometheus 9090:80"
-      #       echo ""
-            
-      #       echo "🎉 === Monitoring Setup Complete ==="
+            echo "✅ User setup complete"
+            echo "✅ K8s setup complete"
