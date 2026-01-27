@@ -59,7 +59,6 @@ jobs:
               sudo journalctl -xeu etcd.service
               exit 1
             fi
-            
             echo "✅ etcd 정상"
             
             # kubeadm reset
