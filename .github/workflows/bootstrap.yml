@@ -39,7 +39,7 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y python3-pip python3-venv git
             
-            # 가상환경 생성
+            # Create virtual env
             python3 -m venv ~/.venv-kubespray
             source ~/.venv-kubespray/bin/activate
             
@@ -48,10 +48,10 @@ jobs:
             git clone https://github.com/kubernetes-sigs/kubespray.git
             cd kubespray
             
-            # v2.28.1 LTS 버전
+            # v2.28.1 LTS version
             git checkout v2.28.1
             
-            # 가상환경에서 설치
+            # Install requirements vis Kubespray in virtual env
             pip install -r requirements.txt
             
             cp -rfp inventory/sample inventory/mycluster
