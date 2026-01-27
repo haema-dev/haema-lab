@@ -37,21 +37,35 @@ jobs:
 
             echo "🔍 Complete cleanup"
 
-            # 1️⃣ 포트 해제
+            # 포트 해제
             sudo fuser -k 6443/tcp 2>/dev/null || true
             sudo fuser -k 10259/tcp 2>/dev/null || true
             sudo fuser -k 10257/tcp 2>/dev/null || true
             
-            # 2️⃣ etcd 먼저 정리 (kubeadm reset 전)
+            # etcd 안전하게 정리
             sudo systemctl stop etcd || true
             sudo rm -rf /var/lib/etcd/*
-            sudo systemctl start etcd
-            sleep 3
+            sudo mkdir -p /var/lib/etcd
+            sudo chown -R etcd:etcd /var/lib/etcd
+            sudo chmod 700 /var/lib/etcd
             
-            # 3️⃣ 이제 kubeadm reset 실행
+            # etcd 상태 확인
+            sudo systemctl start etcd
+            sleep 5
+            
+            # etcd 정상 확인
+            if ! sudo systemctl is-active --quiet etcd; then
+              echo "⚠️ etcd 시작 실패"
+              sudo journalctl -xeu etcd.service
+              exit 1
+            fi
+            
+            echo "✅ etcd 정상"
+            
+            # kubeadm reset
             sudo kubeadm reset -f --cri-socket unix:///run/containerd/containerd.sock || true
             
-            # 4️⃣ kubelet 정리
+            # kubelet 정리
             sudo systemctl stop kubelet || true
             sudo rm -rf /var/lib/kubelet/*
             sleep 2
