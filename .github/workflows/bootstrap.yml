@@ -235,11 +235,8 @@ jobs:
               - "kubernetes.default.svc"
               - "kubernetes.default.svc.cluster.local"
             EOF
-            
-            # all.yml에서 변수 치환
-            sed -i "s|\$HOST_IP|$HOST_IP|g" "$INVENTORY_DIR/group_vars/all/all.yml"
-            
-            echo "   ✅ Inventory configured"
+
+            echo "✅ Inventory configured"
             
             # ============================================
             # 6️⃣ Kubespray 실행 (멱등성)
