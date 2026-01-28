@@ -78,6 +78,13 @@ jobs:
             # 7. Clean ports
             echo "🔌 Cleaning ports..."
             sudo fuser -k -9 6443/tcp 2379/tcp 10250/tcp 10259/tcp 10257/tcp 8080/tcp 2>/dev/null || true
+
+            # ✅ 여기에 추가
+            echo "🏷️  Setting hostname to USERNAME..."
+            sudo hostnamectl set-hostname "${{ secrets.USERNAME }}"
+
+            sleep 3
+            echo "✅ Cleanup complete"
             
             sleep 3
             echo "✅ Cleanup complete"
@@ -193,19 +200,19 @@ jobs:
             cat > "$INVENTORY_DIR/hosts.yaml" << 'HOSTS'
             all:
               hosts:
-                localhost:
+                ${{ secrets.USERNAME }}:
                   ansible_connection: local
                   ansible_host: 127.0.0.1
               children:
                 kube_control_plane:
                   hosts:
-                    localhost:
+                    ${{ secrets.USERNAME }}:
                 kube_node:
                   hosts:
-                    localhost:
+                    ${{ secrets.USERNAME }}:
                 etcd:
                   hosts:
-                    localhost:
+                    ${{ secrets.USERNAME }}:
                 k8s_cluster:
                   children:
                     kube_control_plane:
