@@ -61,7 +61,7 @@ jobs:
             sleep 5
             
             echo "✅ Cleanup complete"
-            
+
 
       - name: Setup K8s with Kubespray
         uses: appleboy/ssh-action@master
@@ -222,8 +222,8 @@ jobs:
             kube_apiserver_bind_address: "0.0.0.0"
             
             kubelet_deployment_type: host
-            kubeadm_init_timeout: 600
-            upgrade_cluster_setup_timeout: 600
+            kubeadm_init_timeout: 1800
+            upgrade_cluster_setup_timeout: 1800
             skip_kubelet_systemd_environment_file_checks: true
             
             kubelet_extra_args: "--cluster-dns=10.96.0.10"
