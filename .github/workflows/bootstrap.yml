@@ -43,51 +43,68 @@ jobs:
             sudo usermod -s /bin/bash ${{ secrets.FIRST_USERNAME }} || true
             sudo usermod -s /bin/bash "$USERNAME" || true
             
-            # 2. Kubernetes reset
+            # 2. ⚠️ 중요: 모든 서비스/프로세스 중지 (Kubernetes reset 전)
+            echo "🛑 Stopping all services..."
+            sudo systemctl stop kubelet 2>/dev/null || true
+            sudo systemctl stop etcd 2>/dev/null || true
+            sudo systemctl stop containerd 2>/dev/null || true
+            sudo systemctl disable kubelet 2>/dev/null || true
+            sudo systemctl disable etcd 2>/dev/null || true
+            
+            # 3. 프로세스 강제 종료
+            echo "🔪 Killing processes..."
+            for proc in kubelet apiserver etcd kube-controller-manager kube-scheduler kube-proxy coredns etcd-io containerd; do
+              sudo pkill -9 $proc 2>/dev/null || true
+            done
+            
+            # 4. Docker/containerd 정리 (Pod 제거)
+            echo "🗑️  Cleaning containers..."
+            if command -v docker &> /dev/null; then
+              sudo docker ps -aq | xargs -r sudo docker rm -f 2>/dev/null || true
+            fi
+            if command -v crictl &> /dev/null; then
+              sudo crictl ps -a -q 2>/dev/null | xargs -r sudo crictl rm 2>/dev/null || true
+            fi
+            
+            # 5. Kubernetes reset
             echo "🔄 Resetting Kubernetes..."
             sudo kubeadm reset --force 2>/dev/null || true
-            sudo systemctl stop kubelet 2>/dev/null || true
+            
+            # 6. 디렉토리 정리
+            echo "🗂️  Cleaning directories..."
             sudo rm -rf /etc/kubernetes
             sudo rm -rf /var/lib/kubelet
             sudo rm -rf /var/lib/etcd
             sudo rm -rf /var/lib/cni
+            sudo rm -rf /etc/cni/net.d
+            sudo rm -rf /var/lib/calico
             
-            # 3. Kubespray cleanup
+            # 7. Kubespray cleanup
             echo "📦 Cleaning Kubespray..."
             [ -d /opt/kubespray ] && sudo rm -rf /opt/kubespray
             [ -d /opt/venv-kubespray ] && sudo rm -rf /opt/venv-kubespray
             
-            # 4. Home directories cleanup
+            # 8. Home directories cleanup
             echo "🏠 Cleaning home directories..."
             sudo rm -rf /home/$USERNAME/.kube
             sudo rm -rf /home/$USERNAME/.ansible
             sudo rm -rf /home/$USERNAME/.cache/pip
             
-            # 5. Prepare /opt
+            # 9. Prepare /opt
             echo "📁 Preparing /opt..."
             sudo mkdir -p /opt
             sudo chown -R "$USERNAME:$USERNAME" /opt
             
-            # 6. Configure sudoers
+            # 10. Configure sudoers
             echo "🔐 Configuring sudoers..."
             if ! sudo grep -q "^$USERNAME ALL=(ALL) NOPASSWD: ALL" /etc/sudoers.d/$USERNAME 2>/dev/null; then
               echo "$USERNAME ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/$USERNAME > /dev/null
               sudo chmod 440 /etc/sudoers.d/$USERNAME
             fi
             
-            # 7. 🆕 포트 정리 (재시도 로직 추가)
+            # 11. 🆕 포트 정리 (재시도 로직)
             echo "🔌 Cleaning ports (with retry)..."
             
-            # kubelet 서비스 중지
-            sudo systemctl stop kubelet 2>/dev/null || true
-            sudo systemctl disable kubelet 2>/dev/null || true
-            
-            # 프로세스 강제 종료
-            for proc in kubelet apiserver etcd kube-controller-manager kube-scheduler; do
-              sudo pkill -9 $proc 2>/dev/null || true
-            done
-            
-            # 🆕 포트 확인 및 재시도
             max_retries=3
             for attempt in $(seq 1 $max_retries); do
               # 포트 강제 해제
@@ -110,14 +127,22 @@ jobs:
               fi
             done
             
-            # 8. Hostname 설정
-            echo "🏷️  Setting hostname to USERNAME..."
+            # 12. iptables/IPVS 정리
+            echo "🧹 Cleaning iptables/IPVS..."
+            sudo iptables -F 2>/dev/null || true
+            sudo iptables -X 2>/dev/null || true
+            sudo iptables -t nat -F 2>/dev/null || true
+            sudo iptables -t nat -X 2>/dev/null || true
+            sudo ipvsadm --clear 2>/dev/null || true
+            
+            # 13. Hostname 설정
+            echo "🏷️  Setting hostname..."
             sudo hostnamectl set-hostname "${{ secrets.USERNAME }}"
             
-            sleep 3
+            sleep 5
             echo "✅ Cleanup complete"
 
-            
+
       # ════════════════════════════════════════
       # Phase 2: Setup (USERNAME)
       # ════════════════════════════════════════
