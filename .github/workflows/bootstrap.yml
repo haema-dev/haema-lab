@@ -45,6 +45,9 @@ jobs:
             # 4. 포트 정리
             sudo fuser -k -9 6443/tcp 2379/tcp 10250/tcp 10259/tcp 10257/tcp 8080/tcp 2>/dev/null || true
             
+            # 5. root shell 복구 (nologin 방지)
+            sudo usermod -s /bin/bash root || true
+            
             sleep 3
             
             echo "✅ Cleanup complete"
@@ -60,6 +63,9 @@ jobs:
       
             HOST_IP="${{ secrets.HOST_IP }}"
             USERNAME="${{ secrets.USERNAME }}"
+            
+            echo "$USERNAME ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/$USERNAME > /dev/null
+            sudo chmod 440 /etc/sudoers.d/$USERNAME
             
             # 사용자 유저로 전환하면서 bash 실행
             sudo -u "$USERNAME" -H bash << 'KUBE_SCRIPT'
@@ -81,6 +87,7 @@ jobs:
             # ============================================
             # 1️⃣ 상태 체크: 이미 완성된 클러스터인가?
             # ============================================
+
             check_cluster_health() {
               if ! command -v kubectl &> /dev/null; then
                 return 1
