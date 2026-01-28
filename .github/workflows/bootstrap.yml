@@ -115,8 +115,8 @@ jobs:
             # ============================================
             echo ""
             echo "📦 Installing dependencies..."
-            apt-get update -qq
-            apt-get install -y -qq \
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq \
               python3-pip python3-venv git jq curl \
               2>&1 | grep -v "^Processing triggers\|^done\.$" || true
             
