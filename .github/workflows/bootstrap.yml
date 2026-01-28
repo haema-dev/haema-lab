@@ -77,8 +77,6 @@ jobs:
             KUBESPRAY_VERSION="v2.29.0"
             KUBESPRAY_HOME="/opt/kubespray"
             VENV_PATH="/opt/venv-kubespray"
-            HOST_IP="$HOST_IP"
-            USERNAME="$USERNAME"
             
             echo "════════════════════════════════════"
             echo "🔄 Kubespray Idempotent Setup"
