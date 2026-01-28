@@ -21,7 +21,6 @@ jobs:
           version: 1.94.1
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
 
-
       - name: Cleanup K8s
         uses: appleboy/ssh-action@master
         with:
@@ -49,7 +48,6 @@ jobs:
             sleep 3
             
             echo "✅ Cleanup complete"
-
 
       - name: Setup K8s with Kubespray
         uses: appleboy/ssh-action@master
@@ -159,7 +157,7 @@ jobs:
             pip install -q -r "$KUBESPRAY_HOME/requirements.txt"
             
             # ============================================
-            # 5️⃣ Ansible 인벤토리 설정 (당신의 구조 유지)
+            # 5️⃣ Ansible 인벤토리 설정
             # ============================================
             echo ""
             echo "📋 Configuring Ansible inventory..."
@@ -174,7 +172,7 @@ jobs:
             
             mkdir -p "$INVENTORY_DIR/group_vars/all"
             
-            # hosts.yaml - 당신의 Secrets 값 사용
+            # hosts.yaml
             cat > "$INVENTORY_DIR/hosts.yaml" <<HOSTS
             all:
               hosts:
@@ -198,11 +196,8 @@ jobs:
                     kube_control_plane:
                     kube_node:
             HOSTS
-
-            sed -i "s|\$USERNAME|$USERNAME|g" "$INVENTORY_DIR/hosts.yaml"
-            sed -i "s|\$HOST_IP|$HOST_IP|g" "$INVENTORY_DIR/hosts.yaml"
             
-            # all.yml - Secrets 값 사용
+            # all.yml
             cat > "$INVENTORY_DIR/group_vars/all/all.yml" <<EOF
             kube_version: "1.31.6"
             container_manager: containerd
@@ -211,29 +206,33 @@ jobs:
             kube_service_addresses: 10.96.0.0/12
             kube_apiserver_advertise_address: $HOST_IP
             kube_apiserver_bind_address: "0.0.0.0"
+            
             kubelet_deployment_type: host
             kubeadm_init_timeout: 600
             upgrade_cluster_setup_timeout: 600
             skip_kubelet_systemd_environment_file_checks: true
-
-            # ✅ 표준 DNS 설정
+            
             kubelet_extra_args: "--cluster-dns=10.96.0.10"
             kube_dns_servers:
               - 10.96.0.10
-
-            # ✅ containerd SystemdCgroup 설정
+            
             containerd_cgroup_driver: systemd
             kubelet_cgroup_driver: systemd
-
-            # 인증서 주체명 설정 (재생성 방지)
+            
             apiserver_cert_extra_sans:
-              - $HOST_IP
+              - "localhost"
+              - "127.0.0.1"
+              - "$HOST_IP"
+              - "kubernetes"
+              - "kubernetes.default"
+              - "kubernetes.default.svc"
+              - "kubernetes.default.svc.cluster.local"
             EOF
-
+            
             echo "✅ Inventory configured"
             
             # ============================================
-            # 6️⃣ Kubespray 실행 (멱등성)
+            # 6️⃣ Kubespray 실행
             # ============================================
             echo ""
             echo "🚀 Running Kubespray..."
@@ -256,7 +255,23 @@ jobs:
             echo "✅ Kubespray completed"
             
             # ============================================
-            # 7️⃣ kubeconfig 설정
+            # 7️⃣ kubeconfig 수정 (kubeadm init 이후)
+            # ============================================
+            echo ""
+            echo "🔑 Patching kubeconfig with HOST_IP..."
+            
+            if [ -f /etc/kubernetes/admin.conf ]; then
+              sed -i "s|server:.*6443|server: https://$HOST_IP:6443|g" /etc/kubernetes/admin.conf
+              echo "   ✅ /etc/kubernetes/admin.conf patched"
+            fi
+            
+            if [ -f ~/.kube/config ]; then
+              sed -i "s|server:.*6443|server: https://$HOST_IP:6443|g" ~/.kube/config
+              echo "   ✅ ~/.kube/config patched"
+            fi
+            
+            # ============================================
+            # 8️⃣ kubeconfig 복사
             # ============================================
             echo ""
             echo "🔑 Setting up kubeconfig..."
@@ -274,7 +289,7 @@ jobs:
             fi
             
             # ============================================
-            # 8️⃣ Shell 수정
+            # 9️⃣ Shell 수정
             # ============================================
             echo ""
             echo "🔧 Fixing shell configuration..."
@@ -282,7 +297,7 @@ jobs:
             echo "   ✅ Shell fixed"
             
             # ============================================
-            # 9️⃣ 최종 검증
+            # 🔟 최종 검증
             # ============================================
             echo ""
             echo "✓ Verifying cluster..."
