@@ -274,13 +274,14 @@ jobs:
             cd "$KUBESPRAY_HOME"
             
             ansible-playbook \
-            -i "$INVENTORY_DIR/hosts.yaml" \
-            --become \
-            --become-user=${{ secrets.USERNAME }} \
-            -e "kubeconfig_localhost=false" \
-            -e "kubeconfig_server=https://${{ secrets.HOST_IP }}:6443" \
-            -v \
-            cluster.yml
+              -i "$INVENTORY_DIR/hosts.yaml" \
+              --become \
+              --become-method=sudo \
+              -e "kubeconfig_localhost=false" \
+              -e "kubeconfig_server=https://${{ secrets.HOST_IP }}:6443" \
+              -e "kube_owner=${{ secrets.USERNAME }}" \
+              -v \
+              cluster.yml
             
             if [ $? -ne 0 ]; then
               echo "❌ Kubespray failed"
