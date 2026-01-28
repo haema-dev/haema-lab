@@ -56,14 +56,14 @@ jobs:
           username: ${{ secrets.FIRST_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            set -euo pipefail
+            set -e
       
             HOST_IP="${{ secrets.HOST_IP }}"
             USERNAME="${{ secrets.USERNAME }}"
             
             # 사용자 유저로 전환하면서 bash 실행
             sudo -u "$USERNAME" -H bash << 'KUBE_SCRIPT'
-            set -euo pipefail
+            set -e
             
             KUBE_VERSION="1.31.6"
             KUBESPRAY_VERSION="v2.29.0"
