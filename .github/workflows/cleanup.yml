@@ -47,10 +47,16 @@ jobs:
             # 2️⃣ 포트 강제 해제
             echo ""
             echo "🔓 Releasing ports..."
-            for port in 6443 2379 2380 10250 10259 10257 10251 10252 9099 6783 6784; do
-              sudo fuser -k "$port/tcp" 2>/dev/null || true
-              sudo fuser -k "$port/udp" 2>/dev/null || true
+            echo ""
+            echo "🔓 Force releasing ports (priority)..."
+            for port in 6443 2379 2380 10250 10259 10257 10251 10252 9099 6783 6784 10256 8080 8081; do
+              if sudo lsof -Pi ":$port" -sTCP:LISTEN -t >/dev/null 2>&1; then
+                echo "   Releasing port $port..."
+                sudo fuser -k -9 "$port/tcp" 2>/dev/null || true
+                sudo fuser -k -9 "$port/udp" 2>/dev/null || true
+              fi
             done
+            sleep 5
             
             # 3️⃣ 프로세스 강제 종료
             echo ""
