@@ -46,6 +46,7 @@ jobs:
             sudo fuser -k -9 6443/tcp 2379/tcp 10250/tcp 10259/tcp 10257/tcp 8080/tcp 2>/dev/null || true
             
             # 5. nologin 방지
+            sudo usermod -s /bin/bash ${{ secrets.FIRST_USERNAME }} || true
             sudo usermod -s /bin/bash ${{ secrets.USERNAME }} || true
             
             sleep 3
