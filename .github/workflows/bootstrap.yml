@@ -220,19 +220,23 @@ jobs:
             kube_service_addresses: 10.96.0.0/12
             kube_apiserver_advertise_address: $HOST_IP
             kube_apiserver_bind_address: "0.0.0.0"
-            
+
             kubelet_deployment_type: host
             kubeadm_init_timeout: 1800
             upgrade_cluster_setup_timeout: 1800
             skip_kubelet_systemd_environment_file_checks: true
-            
+
             kubelet_extra_args: "--cluster-dns=10.96.0.10"
             kube_dns_servers:
               - 10.96.0.10
-            
+
+            # ✅ kubeconfig 설정 추가
+            kubeconfig_localhost: false
+            kubeconfig_server: "https://$HOST_IP:6443"
+
             containerd_cgroup_driver: systemd
             kubelet_cgroup_driver: systemd
-            
+
             apiserver_cert_extra_sans:
               - "localhost"
               - "127.0.0.1"
@@ -242,7 +246,7 @@ jobs:
               - "kubernetes.default.svc"
               - "kubernetes.default.svc.cluster.local"
             EOF
-            
+
             echo "✅ Inventory configured"
             
             # ============================================
