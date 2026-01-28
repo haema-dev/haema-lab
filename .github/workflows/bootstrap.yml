@@ -21,34 +21,6 @@ jobs:
           version: 1.94.1
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
 
-      - name: Pre-flight Port Check & Cleanup
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
-          username: ${{ secrets.FIRST_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            set -e
-            
-            echo "🔍 Checking port occupation..."
-            OCCUPIED_PORTS=""
-            for port in 6443 2379 10250; do
-              if sudo lsof -Pi ":$port" -sTCP:LISTEN -t >/dev/null 2>&1; then
-                OCCUPIED_PORTS="$OCCUPIED_PORTS $port"
-              fi
-            done
-            
-            if [ ! -z "$OCCUPIED_PORTS" ]; then
-              echo "⚠️ Ports occupied:$OCCUPIED_PORTS"
-              echo "🧹 Force cleaning..."
-              sudo systemctl stop kubelet etcd 2>/dev/null || true
-              for port in $OCCUPIED_PORTS; do
-                sudo fuser -k "$port/tcp" 2>/dev/null || true
-              done
-              sleep 3
-            else
-              echo "✅ All ports free"
-            fi
 
       - name: Setup K8s with Kubespray
         uses: appleboy/ssh-action@master
