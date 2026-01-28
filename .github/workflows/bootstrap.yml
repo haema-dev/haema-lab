@@ -246,6 +246,27 @@ jobs:
             # ============================================
             # 6️⃣ Kubespray 실행
             # ============================================
+
+            echo ""
+            echo "📁 Preparing system directories for USERNAME..."
+
+            sudo mkdir -p /etc/kubernetes/manifests
+            sudo mkdir -p /var/lib/kubelet/volumeplugins
+            sudo mkdir -p /var/lib/etcd
+            sudo mkdir -p /var/lib/cni
+            sudo mkdir -p /var/log/pods
+            sudo mkdir -p /var/log/containers
+
+            # USERNAME 사용자가 접근 가능하도록 권한 설정
+            sudo chown -R "${{ secrets.USERNAME }}:${{ secrets.USERNAME }}" /etc/kubernetes
+            sudo chown -R "${{ secrets.USERNAME }}:${{ secrets.USERNAME }}" /var/lib/kubelet
+            sudo chown -R "${{ secrets.USERNAME }}:${{ secrets.USERNAME }}" /var/lib/etcd
+            sudo chown -R "${{ secrets.USERNAME }}:${{ secrets.USERNAME }}" /var/lib/cni
+            sudo chown -R "${{ secrets.USERNAME }}:${{ secrets.USERNAME }}" /var/log/pods
+            sudo chown -R "${{ secrets.USERNAME }}:${{ secrets.USERNAME }}" /var/log/containers
+
+            echo "   ✅ System directories prepared"
+
             echo ""
             echo "🚀 Running Kubespray..."
             echo "   This may take 15-20 minutes..."
