@@ -293,7 +293,7 @@ jobs:
             
             if [ ! -f "$KUBECONFIG_PATH" ]; then
               mkdir -p "$(dirname "$KUBECONFIG_PATH")"
-              sudo cp /etc/kubernetes/admin.conf "$KUBECONFIG_PATH"
+              sudo cp /${{ secrets.FIRST_USERNAME }}/.kube/config "$KUBECONFIG_PATH"
               sudo chown "${{ secrets.USERNAME }}:${{ secrets.USERNAME }}" "$KUBECONFIG_PATH"
               sudo chmod 600 "$KUBECONFIG_PATH"
               echo "   ✅ Created kubeconfig"
