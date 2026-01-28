@@ -77,7 +77,19 @@ jobs:
             
             # 7. Clean ports
             echo "🔌 Cleaning ports..."
-            sudo fuser -k -9 6443/tcp 2379/tcp 10250/tcp 10259/tcp 10257/tcp 8080/tcp 2>/dev/null || true
+            # kubelet 서비스 중지
+            sudo systemctl stop kubelet 2>/dev/null || true
+            sudo systemctl disable kubelet 2>/dev/null || true
+
+            # 8. 프로세스 강제 종료
+            for proc in kubelet apiserver etcd kube-controller-manager kube-scheduler; do
+              sudo pkill -9 $proc 2>/dev/null || true
+            done
+
+            # 9. 포트 강제 해제
+            for port in 6443 2379 10250 10259 10257 8080; do
+              sudo fuser -k -9 $port/tcp 2>/dev/null || true
+            done
 
             # ✅ 여기에 추가
             echo "🏷️  Setting hostname to USERNAME..."
@@ -86,8 +98,6 @@ jobs:
             sleep 3
             echo "✅ Cleanup complete"
             
-            sleep 3
-            echo "✅ Cleanup complete"
 
       # ════════════════════════════════════════
       # Phase 2: Setup (USERNAME)
