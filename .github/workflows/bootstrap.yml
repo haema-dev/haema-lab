@@ -24,7 +24,7 @@ jobs:
       # ════════════════════════════════════════
       # Phase 1: Cleanup (FIRST_USERNAME)
       # ════════════════════════════════════════
-      - name: Cleanup K8s
+      - name: 🧹 Cleanup K8s
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
@@ -75,30 +75,49 @@ jobs:
               sudo chmod 440 /etc/sudoers.d/$USERNAME
             fi
             
-            # 7. Clean ports
-            echo "🔌 Cleaning ports..."
+            # 7. 🆕 포트 정리 (재시도 로직 추가)
+            echo "🔌 Cleaning ports (with retry)..."
+            
             # kubelet 서비스 중지
             sudo systemctl stop kubelet 2>/dev/null || true
             sudo systemctl disable kubelet 2>/dev/null || true
-
-            # 8. 프로세스 강제 종료
+            
+            # 프로세스 강제 종료
             for proc in kubelet apiserver etcd kube-controller-manager kube-scheduler; do
               sudo pkill -9 $proc 2>/dev/null || true
             done
-
-            # 9. 포트 강제 해제
-            for port in 6443 2379 10250 10259 10257 8080; do
-              sudo fuser -k -9 $port/tcp 2>/dev/null || true
+            
+            # 🆕 포트 확인 및 재시도
+            max_retries=3
+            for attempt in $(seq 1 $max_retries); do
+              # 포트 강제 해제
+              for port in 6443 2379 10250 10259 10257 8080; do
+                sudo fuser -k -9 $port/tcp 2>/dev/null || true
+              done
+              
+              # 포트 상태 확인
+              ports_in_use=$(sudo netstat -tlnp 2>/dev/null | grep -E '6443|10259|10257' | wc -l || echo 0)
+              if [ $ports_in_use -eq 0 ]; then
+                echo "✅ All ports free (attempt $attempt)"
+                break
+              fi
+              
+              if [ $attempt -lt $max_retries ]; then
+                echo "⚠️  Ports still in use, retrying... ($attempt/$max_retries)"
+                sleep 3
+              else
+                echo "⚠️  Warning: Some ports may still be in use, proceeding anyway..."
+              fi
             done
-
-            # ✅ 여기에 추가
+            
+            # 8. Hostname 설정
             echo "🏷️  Setting hostname to USERNAME..."
             sudo hostnamectl set-hostname "${{ secrets.USERNAME }}"
-
+            
             sleep 3
             echo "✅ Cleanup complete"
-            
 
+            
       # ════════════════════════════════════════
       # Phase 2: Setup (USERNAME)
       # ════════════════════════════════════════
