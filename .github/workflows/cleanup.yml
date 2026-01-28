@@ -1,6 +1,5 @@
 name: Cleanup K8s Only
 
-
 on:
   workflow_dispatch:
   push:
@@ -13,7 +12,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
-
     steps:
       - uses: actions/checkout@v3
       
@@ -22,7 +20,6 @@ jobs:
         with:
           version: 1.94.1
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
-
 
       - name: 🧹 Complete Cleanup (Remove All K8s)
         uses: appleboy/ssh-action@master
@@ -37,16 +34,7 @@ jobs:
             echo "🧹 COMPLETE CLEANUP"
             echo "════════════════════════════════════"
             
-            # 1️⃣ 서비스 중지
-            echo ""
-            echo "🛑 Stopping services..."
-            sudo systemctl stop kubelet kube-apiserver kube-controller-manager kube-scheduler etcd docker containerd 2>/dev/null || true
-            sudo systemctl disable kubelet kube-apiserver kube-controller-manager kube-scheduler etcd docker containerd 2>/dev/null || true
-            sleep 3
-            
-            # 2️⃣ 포트 강제 해제
-            echo ""
-            echo "🔓 Releasing ports..."
+            # 1️⃣ 포트 강제 해제 (먼저!)
             echo ""
             echo "🔓 Force releasing ports (priority)..."
             for port in 6443 2379 2380 10250 10259 10257 10251 10252 9099 6783 6784 10256 8080 8081; do
@@ -57,6 +45,14 @@ jobs:
               fi
             done
             sleep 5
+
+            
+            # 2️⃣ 서비스 중지
+            echo ""
+            echo "🛑 Stopping services..."
+            sudo systemctl stop kubelet kube-apiserver kube-controller-manager kube-scheduler etcd docker containerd 2>/dev/null || true
+            sudo systemctl disable kubelet kube-apiserver kube-controller-manager kube-scheduler etcd docker containerd 2>/dev/null || true
+            sleep 3
             
             # 3️⃣ 프로세스 강제 종료
             echo ""
@@ -128,6 +124,23 @@ jobs:
             echo "💾 Freeing memory..."
             sync
             echo 3 | sudo tee /proc/sys/vm/drop_caches > /dev/null
+            
+            # 1️⃣1️⃣ 최종 포트 확인
+            echo ""
+            echo "✓ Final port verification..."
+            STUCK_PORTS=""
+            for port in 6443 2379 10250 8080; do
+              if sudo lsof -Pi ":$port" -sTCP:LISTEN -t >/dev/null 2>&1; then
+                STUCK_PORTS="$STUCK_PORTS $port"
+              fi
+            done
+
+            
+            if [ -z "$STUCK_PORTS" ]; then
+              echo "   ✅ All critical ports free"
+            else
+              echo "   ⚠️  WARNING: Ports still occupied:$STUCK_PORTS"
+            fi
             
             echo ""
             echo "════════════════════════════════════"
