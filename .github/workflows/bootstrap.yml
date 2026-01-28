@@ -52,6 +52,26 @@ jobs:
             echo "📁 Setting /opt permissions..."
             sudo mkdir -p /opt
             sudo chown -R "${{ secrets.USERNAME }}:${{ secrets.USERNAME }}" /opt
+
+            echo ""
+            echo "📁 Preparing system directories for USERNAME..."
+
+            sudo mkdir -p /etc/kubernetes/manifests
+            sudo mkdir -p /var/lib/kubelet/volumeplugins
+            sudo mkdir -p /var/lib/etcd
+            sudo mkdir -p /var/lib/cni
+            sudo mkdir -p /var/log/pods
+            sudo mkdir -p /var/log/containers
+
+            # USERNAME 사용자가 접근 가능하도록 권한 설정
+            sudo chown -R "${{ secrets.USERNAME }}:${{ secrets.USERNAME }}" /etc/kubernetes
+            sudo chown -R "${{ secrets.USERNAME }}:${{ secrets.USERNAME }}" /var/lib/kubelet
+            sudo chown -R "${{ secrets.USERNAME }}:${{ secrets.USERNAME }}" /var/lib/etcd
+            sudo chown -R "${{ secrets.USERNAME }}:${{ secrets.USERNAME }}" /var/lib/cni
+            sudo chown -R "${{ secrets.USERNAME }}:${{ secrets.USERNAME }}" /var/log/pods
+            sudo chown -R "${{ secrets.USERNAME }}:${{ secrets.USERNAME }}" /var/log/containers
+
+            echo "   ✅ System directories prepared"
             
             # 6. nologin 방지
             sudo usermod -s /bin/bash "${{ secrets.USERNAME }}" || true
@@ -248,26 +268,6 @@ jobs:
             # ============================================
 
             echo ""
-            echo "📁 Preparing system directories for USERNAME..."
-
-            sudo mkdir -p /etc/kubernetes/manifests
-            sudo mkdir -p /var/lib/kubelet/volumeplugins
-            sudo mkdir -p /var/lib/etcd
-            sudo mkdir -p /var/lib/cni
-            sudo mkdir -p /var/log/pods
-            sudo mkdir -p /var/log/containers
-
-            # USERNAME 사용자가 접근 가능하도록 권한 설정
-            sudo chown -R "${{ secrets.USERNAME }}:${{ secrets.USERNAME }}" /etc/kubernetes
-            sudo chown -R "${{ secrets.USERNAME }}:${{ secrets.USERNAME }}" /var/lib/kubelet
-            sudo chown -R "${{ secrets.USERNAME }}:${{ secrets.USERNAME }}" /var/lib/etcd
-            sudo chown -R "${{ secrets.USERNAME }}:${{ secrets.USERNAME }}" /var/lib/cni
-            sudo chown -R "${{ secrets.USERNAME }}:${{ secrets.USERNAME }}" /var/log/pods
-            sudo chown -R "${{ secrets.USERNAME }}:${{ secrets.USERNAME }}" /var/log/containers
-
-            echo "   ✅ System directories prepared"
-
-            echo ""
             echo "🚀 Running Kubespray..."
             echo "   This may take 15-20 minutes..."
             
@@ -292,11 +292,14 @@ jobs:
             # ============================================
             # 7️⃣ kubeconfig 수정 (kubeadm init 이후)
             # ============================================
+            
+            KUBECONFIG_PATH="/home/${{ secrets.USERNAME }}/.kube/config"
+
             echo ""
             echo "🔑 Patching kubeconfig with HOST_IP..."
 
-            if [ -f "/home/${{ secrets.USERNAME }}/.kube/config" ]; then
-              sed -i "s|server:.*6443|server: https://${{ secrets.HOST_IP }}:6443|g" "/home/${{ secrets.USERNAME }}/.kube/config"
+            if [ -f "$KUBECONFIG_PATH" ]; then
+              sed -i "s|server:.*6443|server: https://${{ secrets.HOST_IP }}:6443|g" "$KUBECONFIG_PATH"
               echo "   ✅ kubeconfig patched"
             fi
             
@@ -305,8 +308,6 @@ jobs:
             # ============================================
             echo ""
             echo "🔑 Setting up kubeconfig..."
-            
-            KUBECONFIG_PATH="/home/${{ secrets.USERNAME }}/.kube/config"
             
             if [ ! -f "$KUBECONFIG_PATH" ]; then
               mkdir -p "$(dirname "$KUBECONFIG_PATH")"
