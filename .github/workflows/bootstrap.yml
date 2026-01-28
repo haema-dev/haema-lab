@@ -39,8 +39,8 @@ jobs:
             sudo rm -rf /etc/kubernetes
             
             # 3. Kubespray 캐시 삭제
-            rm -rf /opt/kubespray/.cache
-            rm -rf /opt/kubespray
+            sudo rm -rf /opt/kubespray/.cache
+            sudo rm -rf /opt/kubespray
             
             # 4. 포트 정리
             sudo fuser -k -9 6443/tcp 2379/tcp 10250/tcp 10259/tcp 10257/tcp 8080/tcp 2>/dev/null || true
@@ -57,15 +57,20 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -euo pipefail
+      
+            HOST_IP="${{ secrets.HOST_IP }}"
+            USERNAME="${{ secrets.USERNAME }}"
+            
+            # 사용자 유저로 전환하면서 bash 실행
+            sudo -u "$USERNAME" -H bash << 'KUBE_SCRIPT'
+            set -euo pipefail
             
             KUBE_VERSION="1.31.6"
             KUBESPRAY_VERSION="v2.29.0"
             KUBESPRAY_HOME="/opt/kubespray"
             VENV_PATH="/opt/venv-kubespray"
-            
-            # Secrets 변수 할당
-            HOST_IP="${{ secrets.HOST_IP }}"
-            USERNAME="${{ secrets.USERNAME }}"
+            HOST_IP="$HOST_IP"
+            USERNAME="$USERNAME"
             
             echo "════════════════════════════════════"
             echo "🔄 Kubespray Idempotent Setup"
@@ -136,7 +141,7 @@ jobs:
               sudo mkdir -p "$KUBESPRAY_HOME"
               git clone --depth 1 --branch "$KUBESPRAY_VERSION" \
                 https://github.com/kubernetes-sigs/kubespray.git "$KUBESPRAY_HOME"
-              sudo chown -R "$USER:$USER" "$KUBESPRAY_HOME"
+              sudo chown -R "$USERNAME:$USERNAME" "$KUBESPRAY_HOME"
             fi
             
             # ============================================
@@ -318,6 +323,7 @@ jobs:
             echo "🎉 Kubernetes setup complete!"
             echo "════════════════════════════════════"
 
-            sleep 5
+            KUBE_SCRIPT
 
-            exit 0  # ← 명시적으로 성공으로 종료
+            sleep 5
+            exit 0
