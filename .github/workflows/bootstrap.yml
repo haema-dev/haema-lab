@@ -45,8 +45,8 @@ jobs:
             # 4. 포트 정리
             sudo fuser -k -9 6443/tcp 2379/tcp 10250/tcp 10259/tcp 10257/tcp 8080/tcp 2>/dev/null || true
             
-            # 5. root shell 복구 (nologin 방지)
-            sudo usermod -s /bin/bash root || true
+            # 5. nologin 방지
+            sudo usermod -s /bin/bash ${{ secrets.USERNAME }} || true
             
             sleep 3
             
@@ -56,21 +56,14 @@ jobs:
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
-          username: ${{ secrets.FIRST_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_USERNAME_PRIVATE_KEY }}
           script: |
             set -e
       
             HOST_IP="${{ secrets.HOST_IP }}"
             USERNAME="${{ secrets.USERNAME }}"
-            
-            echo "$USERNAME ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/$USERNAME > /dev/null
-            sudo chmod 440 /etc/sudoers.d/$USERNAME
-            
-            # 사용자 유저로 전환하면서 bash 실행
-            sudo -u "$USERNAME" -H bash << 'KUBE_SCRIPT'
-            set -e
-            
+
             KUBE_VERSION="1.31.6"
             KUBESPRAY_VERSION="v2.29.0"
             KUBESPRAY_HOME="/opt/kubespray"
@@ -182,10 +175,10 @@ jobs:
               echo "   ✅ Backed up existing inventory"
             fi
             
-            mkdir -p "$INVENTORY_DIR/group_vars/all"
+            sudo mkdir -p "$INVENTORY_DIR/group_vars/all"
             
             # hosts.yaml
-            cat > "$INVENTORY_DIR/hosts.yaml" <<HOSTS
+            cat > "$INVENTORY_DIR/hosts.yaml" <<'HOSTS'
             all:
               hosts:
                 $USERNAME:
@@ -210,7 +203,7 @@ jobs:
             HOSTS
             
             # all.yml
-            cat > "$INVENTORY_DIR/group_vars/all/all.yml" <<EOF
+            cat > "$INVENTORY_DIR/group_vars/all/all.yml" <<'EOF'
             kube_version: "1.31.6"
             container_manager: containerd
             dns_mode: coredns
@@ -279,12 +272,12 @@ jobs:
             echo "🔑 Patching kubeconfig with HOST_IP..."
             
             if [ -f /etc/kubernetes/admin.conf ]; then
-              sed -i "s|server:.*6443|server: https://$HOST_IP:6443|g" /etc/kubernetes/admin.conf
+              sudo sed -i "s|server:.*6443|server: https://$HOST_IP:6443|g" /etc/kubernetes/admin.conf
               echo "   ✅ /etc/kubernetes/admin.conf patched"
             fi
             
             if [ -f ~/.kube/config ]; then
-              sed -i "s|server:.*6443|server: https://$HOST_IP:6443|g" ~/.kube/config
+              sudo sed -i "s|server:.*6443|server: https://$HOST_IP:6443|g" ~/.kube/config
               echo "   ✅ ~/.kube/config patched"
             fi
             
@@ -329,8 +322,6 @@ jobs:
             echo "════════════════════════════════════"
             echo "🎉 Kubernetes setup complete!"
             echo "════════════════════════════════════"
-
-            KUBE_SCRIPT
 
             sleep 5
             exit 0
