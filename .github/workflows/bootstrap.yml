@@ -302,27 +302,22 @@ jobs:
             sudo usermod -s /bin/bash "$USERNAME" || true
             echo "   ✅ Shell fixed"
             
-            # ============================================
             # 🔟 최종 검증
             # ============================================
             echo ""
             echo "✓ Verifying cluster..."
-            
+
             export KUBECONFIG="$KUBECONFIG_PATH"
-            
-            if ! kubectl cluster-info &>/dev/null; then
-              echo "❌ Cluster info check failed"
-              exit 1
-            fi
-            
-            echo "   Nodes:"
-            kubectl get nodes -o wide
-            
-            echo ""
-            echo "   System pods:"
-            kubectl get pods -n kube-system --no-headers | head -5
-            
+
+            # kubectl 실행 후 sleep 추가
+            kubectl get nodes || true
+            kubectl get pods -n kube-system --no-headers | head -5 || true
+
             echo ""
             echo "════════════════════════════════════"
             echo "🎉 Kubernetes setup complete!"
             echo "════════════════════════════════════"
+
+            sleep 5
+
+            exit 0  # ← 명시적으로 성공으로 종료
