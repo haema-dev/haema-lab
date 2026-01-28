@@ -6,6 +6,7 @@
 | :--- | :--- | :--- | :---: | :--- |
 | **01. System Design** | Jan 16 - Jan 19 | Jan 16 - Jan 19 | 0d | **[Complete]** Architecture finalized for fixed hardware baseline. |
 | **02. DevOps & Environment** | Jan 23 - Jan 24 | Jan 26 - **Ongoing** | 4d | **[Cause]** Changes to Kubernetes via Kubespray |
+| **03. Model Evaluation** | - | - | - | - |
 
 > **Current Status:** 🏗️ Stage 02 (DevOps & Environment) in progress.
 
