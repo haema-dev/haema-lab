@@ -247,6 +247,7 @@ jobs:
             apiserver_cert_extra_sans:
               - "localhost"
               - "127.0.0.1"
+              - "0.0.0.0"
               - "$HOST_IP"
               - "kubernetes"
               - "kubernetes.default"
