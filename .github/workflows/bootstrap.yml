@@ -51,10 +51,10 @@ jobs:
             # 5. /opt 권한 설정
             echo "📁 Setting /opt permissions..."
             sudo mkdir -p /opt
-            sudo chown -R "$USERNAME:$USERNAME" /opt
+            sudo chown -R "${{ secrets.USERNAME }}:${{ secrets.USERNAME }}" /opt
             
             # 6. nologin 방지
-            sudo usermod -s /bin/bash "$USERNAME" || true
+            sudo usermod -s /bin/bash "${{ secrets.USERNAME }}" || true
             
             sleep 3
             
@@ -69,9 +69,6 @@ jobs:
           key: ${{ secrets.SSH_USERNAME_PRIVATE_KEY }}
           script: |
             set -e
-      
-            HOST_IP="${{ secrets.HOST_IP }}"
-            USERNAME="${{ secrets.USERNAME }}"
 
             KUBE_VERSION="1.31.6"
             KUBESPRAY_VERSION="v2.29.0"
@@ -187,21 +184,21 @@ jobs:
             cat > "$INVENTORY_DIR/hosts.yaml" <<'HOSTS'
             all:
               hosts:
-                $USERNAME:
+                ${{ secrets.USERNAME }}:
                   ansible_connection: local
-                  ansible_host: $HOST_IP
-                  ip: $HOST_IP
-                  access_ip: $HOST_IP
+                  ansible_host: ${{ secrets.HOST_IP }}
+                  ip: ${{ secrets.HOST_IP }}
+                  access_ip: ${{ secrets.HOST_IP }}
               children:
                 kube_control_plane:
                   hosts:
-                    $USERNAME:
+                    ${{ secrets.USERNAME }}:
                 kube_node:
                   hosts:
-                    $USERNAME:
+                    ${{ secrets.USERNAME }}:
                 etcd:
                   hosts:
-                    $USERNAME:
+                    ${{ secrets.USERNAME }}:
                 k8s_cluster:
                   children:
                     kube_control_plane:
@@ -215,8 +212,8 @@ jobs:
             dns_mode: coredns
             kube_pods_subnet: 10.244.0.0/16
             kube_service_addresses: 10.96.0.0/12
-            kube_apiserver_advertise_address: $HOST_IP
-            kube_apiserver_bind_address: $HOST_IP
+            kube_apiserver_advertise_address: ${{ secrets.HOST_IP }}
+            kube_apiserver_bind_address: ${{ secrets.HOST_IP }}
             
             kubelet_deployment_type: host
             kubeadm_init_timeout: 1800
@@ -229,7 +226,7 @@ jobs:
             kubelet_extra_args: "--cluster-dns=10.96.0.10"
             
             kubeconfig_localhost: false
-            kubeconfig_server: "https://$HOST_IP:6443"
+            kubeconfig_server: "https://${{ secrets.HOST_IP }}:6443"
             
             containerd_cgroup_driver: systemd
             kubelet_cgroup_driver: systemd
@@ -237,7 +234,7 @@ jobs:
             apiserver_cert_extra_sans:
               - "localhost"
               - "127.0.0.1"
-              - "$HOST_IP"
+              - "${{ secrets.HOST_IP }}"
               - "kubernetes"
               - "kubernetes.default"
               - "kubernetes.default.svc"
@@ -259,7 +256,7 @@ jobs:
               -i "$INVENTORY_DIR/hosts.yaml" \
               --become \
               -e "kubeconfig_localhost=false" \
-              -e "kubeconfig_server=https://$HOST_IP:6443" \
+              -e "kubeconfig_server=https://${{ secrets.HOST_IP }}:6443" \
               -v \
               cluster.yml
             
@@ -277,12 +274,12 @@ jobs:
             echo "🔑 Patching kubeconfig with HOST_IP..."
             
             if [ -f /etc/kubernetes/admin.conf ]; then
-              sudo sed -i "s|server:.*6443|server: https://$HOST_IP:6443|g" /etc/kubernetes/admin.conf
+              sudo sed -i "s|server:.*6443|server: https://${{ secrets.HOST_IP }}:6443|g" /etc/kubernetes/admin.conf
               echo "   ✅ /etc/kubernetes/admin.conf patched"
             fi
 
             if [ -f ~/.kube/config ]; then
-              sudo sed -i "s|server:.*6443|server: https://$HOST_IP:6443|g" ~/.kube/config
+              sudo sed -i "s|server:.*6443|server: https://${{ secrets.HOST_IP }}:6443|g" ~/.kube/config
               echo "   ✅ ~/.kube/config patched"
             fi
             
@@ -292,12 +289,12 @@ jobs:
             echo ""
             echo "🔑 Setting up kubeconfig..."
             
-            KUBECONFIG_PATH="/home/$USERNAME/.kube/config"
+            KUBECONFIG_PATH="/home/${{ secrets.USERNAME }}/.kube/config"
             
             if [ ! -f "$KUBECONFIG_PATH" ]; then
               mkdir -p "$(dirname "$KUBECONFIG_PATH")"
               sudo cp /etc/kubernetes/admin.conf "$KUBECONFIG_PATH"
-              sudo chown "$USERNAME:$USERNAME" "$KUBECONFIG_PATH"
+              sudo chown "${{ secrets.USERNAME }}:${{ secrets.USERNAME }}" "$KUBECONFIG_PATH"
               sudo chmod 600 "$KUBECONFIG_PATH"
               echo "   ✅ Created kubeconfig"
             else
@@ -309,7 +306,7 @@ jobs:
             # ============================================
             echo ""
             echo "🔧 Fixing shell configuration..."
-            sudo usermod -s /bin/bash "$USERNAME" || true
+            sudo usermod -s /bin/bash "${{ secrets.USERNAME }}" || true
             echo "   ✅ Shell fixed"
             
             # 🔟 최종 검증
