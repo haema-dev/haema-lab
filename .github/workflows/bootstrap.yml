@@ -46,7 +46,6 @@ jobs:
             sudo fuser -k -9 6443/tcp 2379/tcp 10250/tcp 10259/tcp 10257/tcp 8080/tcp 2>/dev/null || true
             
             # 5. nologin 방지
-            sudo usermod -s /bin/bash ${{ secrets.FIRST_USERNAME }} || true
             sudo usermod -s /bin/bash ${{ secrets.USERNAME }} || true
             
             sleep 3
@@ -115,8 +114,8 @@ jobs:
             # ============================================
             echo ""
             echo "📦 Installing dependencies..."
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq \
+            apt-get update -qq
+            apt-get install -y -qq \
               python3-pip python3-venv git jq curl \
               2>&1 | grep -v "^Processing triggers\|^done\.$" || true
             
@@ -138,11 +137,11 @@ jobs:
               fi
             else
               echo "   📥 Cloning Kubespray..."
-              sudo rm -rf "$KUBESPRAY_HOME"
-              sudo mkdir -p "$KUBESPRAY_HOME"
+              rm -rf "$KUBESPRAY_HOME"
+              mkdir -p "$KUBESPRAY_HOME"
               git clone --depth 1 --branch "$KUBESPRAY_VERSION" \
                 https://github.com/kubernetes-sigs/kubespray.git "$KUBESPRAY_HOME"
-              sudo chown -R "$USERNAME:$USERNAME" "$KUBESPRAY_HOME"
+              chown -R "$USERNAME:$USERNAME" "$KUBESPRAY_HOME"
             fi
             
             # ============================================
@@ -176,7 +175,7 @@ jobs:
               echo "   ✅ Backed up existing inventory"
             fi
             
-            sudo mkdir -p "$INVENTORY_DIR/group_vars/all"
+            mkdir -p "$INVENTORY_DIR/group_vars/all"
             
             # hosts.yaml
             cat > "$INVENTORY_DIR/hosts.yaml" <<'HOSTS'
@@ -253,7 +252,6 @@ jobs:
             ansible-playbook \
               -i "$INVENTORY_DIR/hosts.yaml" \
               --become \
-              --become-method=sudo \
               -e "kubeconfig_localhost=false" \
               -e "kubeconfig_server=https://$HOST_IP:6443" \
               -v \
@@ -273,12 +271,12 @@ jobs:
             echo "🔑 Patching kubeconfig with HOST_IP..."
             
             if [ -f /etc/kubernetes/admin.conf ]; then
-              sudo sed -i "s|server:.*6443|server: https://$HOST_IP:6443|g" /etc/kubernetes/admin.conf
+              sed -i "s|server:.*6443|server: https://$HOST_IP:6443|g" /etc/kubernetes/admin.conf
               echo "   ✅ /etc/kubernetes/admin.conf patched"
             fi
             
             if [ -f ~/.kube/config ]; then
-              sudo sed -i "s|server:.*6443|server: https://$HOST_IP:6443|g" ~/.kube/config
+              sed -i "s|server:.*6443|server: https://$HOST_IP:6443|g" ~/.kube/config
               echo "   ✅ ~/.kube/config patched"
             fi
             
@@ -291,10 +289,10 @@ jobs:
             KUBECONFIG_PATH="/home/$USERNAME/.kube/config"
             
             if [ ! -f "$KUBECONFIG_PATH" ]; then
-              sudo mkdir -p "$(dirname "$KUBECONFIG_PATH")"
-              sudo cp /etc/kubernetes/admin.conf "$KUBECONFIG_PATH"
-              sudo chown -R "$USERNAME:$USERNAME" "$KUBECONFIG_PATH"
-              sudo chmod 600 "$KUBECONFIG_PATH"
+              mkdir -p "$(dirname "$KUBECONFIG_PATH")"
+              cp /etc/kubernetes/admin.conf "$KUBECONFIG_PATH"
+              chown -R "$USERNAME:$USERNAME" "$KUBECONFIG_PATH"
+              chmod 600 "$KUBECONFIG_PATH"
               echo "   ✅ Created kubeconfig"
             else
               echo "   ✅ kubeconfig already exists"
