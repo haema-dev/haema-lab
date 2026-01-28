@@ -10,7 +10,7 @@ on:
 jobs:
   setup:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
 
     steps:
       - uses: actions/checkout@v3
@@ -20,7 +20,6 @@ jobs:
         with:
           version: 1.94.1
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
-
 
       - name: Cleanup K8s
         uses: appleboy/ssh-action@master
@@ -33,35 +32,22 @@ jobs:
             
             echo "🧹 Cleaning up for idempotent deployment..."
             
-            # kubelet & containerd 중단 (우선)
-            sudo systemctl stop kubelet 2>/dev/null || true
-            sudo systemctl stop containerd 2>/dev/null || true
-            
-            # 프로세스 강제 종료
-            sudo killall -9 kubelet 2>/dev/null || true
-            sudo killall -9 containerd 2>/dev/null || true
-            
-            # kubeadm 리셋
+            # 1. kubeadm 리셋
             sudo kubeadm reset --force 2>/dev/null || true
             
-            # kubernetes 설정 삭제
+            # 2. kubernetes 설정 삭제
             sudo rm -rf /etc/kubernetes
-            sudo rm -rf /var/lib/kubelet
             
-            # kubeconfig 삭제
-            rm -rf ~/.kube/config
-            
-            # Kubespray 캐시 삭제
+            # 3. Kubespray 캐시 삭제
             rm -rf /opt/kubespray/.cache
             rm -rf /opt/kubespray
             
-            # 포트 정리 (더 강하게)
-            sudo fuser -k -9 6443/tcp 2379/tcp 10250/tcp 10259/tcp 10257/tcp 8080/tcp 2379/tcp 2380/tcp 2>/dev/null || true
+            # 4. 포트 정리
+            sudo fuser -k -9 6443/tcp 2379/tcp 10250/tcp 10259/tcp 10257/tcp 8080/tcp 2>/dev/null || true
             
-            sleep 5
+            sleep 3
             
             echo "✅ Cleanup complete"
-
 
       - name: Setup K8s with Kubespray
         uses: appleboy/ssh-action@master
@@ -220,23 +206,19 @@ jobs:
             kube_service_addresses: 10.96.0.0/12
             kube_apiserver_advertise_address: $HOST_IP
             kube_apiserver_bind_address: "0.0.0.0"
-
+            
             kubelet_deployment_type: host
-            kubeadm_init_timeout: 1800
-            upgrade_cluster_setup_timeout: 1800
+            kubeadm_init_timeout: 600
+            upgrade_cluster_setup_timeout: 600
             skip_kubelet_systemd_environment_file_checks: true
-
+            
             kubelet_extra_args: "--cluster-dns=10.96.0.10"
             kube_dns_servers:
               - 10.96.0.10
-
-            # ✅ kubeconfig 설정 추가
-            kubeconfig_localhost: false
-            kubeconfig_server: "https://$HOST_IP:6443"
-
+            
             containerd_cgroup_driver: systemd
             kubelet_cgroup_driver: systemd
-
+            
             apiserver_cert_extra_sans:
               - "localhost"
               - "127.0.0.1"
@@ -246,7 +228,7 @@ jobs:
               - "kubernetes.default.svc"
               - "kubernetes.default.svc.cluster.local"
             EOF
-
+            
             echo "✅ Inventory configured"
             
             # ============================================
