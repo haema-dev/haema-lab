@@ -216,7 +216,7 @@ jobs:
             # 6️⃣ Kubespray 실행 (멱등성)
             # ============================================
             echo ""
-            echo "🚀 Running Kubespray (idempotent)..."
+            echo "🚀 Running Kubespray..."
             echo "   This may take 15-20 minutes..."
             
             cd "$KUBESPRAY_HOME"
