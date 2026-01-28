@@ -43,7 +43,7 @@ jobs:
             sudo usermod -s /bin/bash ${{ secrets.FIRST_USERNAME }} || true
             sudo usermod -s /bin/bash "$USERNAME" || true
             
-            # 2. ⚠️ 중요: 모든 서비스/프로세스 중지 (Kubernetes reset 전)
+            # 2. 모든 서비스/프로세스 중지
             echo "🛑 Stopping all services..."
             sudo systemctl stop kubelet 2>/dev/null || true
             sudo systemctl stop etcd 2>/dev/null || true
@@ -57,7 +57,7 @@ jobs:
               sudo pkill -9 $proc 2>/dev/null || true
             done
             
-            # 4. Docker/containerd 정리 (Pod 제거)
+            # 4. Docker/containerd 정리
             echo "🗑️  Cleaning containers..."
             if command -v docker &> /dev/null; then
               sudo docker ps -aq | xargs -r sudo docker rm -f 2>/dev/null || true
@@ -102,7 +102,7 @@ jobs:
               sudo chmod 440 /etc/sudoers.d/$USERNAME
             fi
             
-            # 11. 🆕 포트 정리 (재시도 로직)
+            # 11. 포트 정리 (재시도 로직)
             echo "🔌 Cleaning ports (with retry)..."
             
             max_retries=3
@@ -127,19 +127,13 @@ jobs:
               fi
             done
             
-            # 12. iptables/IPVS 정리
-            echo "🧹 Cleaning iptables/IPVS..."
-            sudo iptables -F 2>/dev/null || true
-            sudo iptables -X 2>/dev/null || true
-            sudo iptables -t nat -F 2>/dev/null || true
-            sudo iptables -t nat -X 2>/dev/null || true
-            sudo ipvsadm --clear 2>/dev/null || true
+            # 🗑️ iptables 정리 제거! (SSH 연결 끊김)
             
-            # 13. Hostname 설정
+            # 12. Hostname 설정
             echo "🏷️  Setting hostname..."
             sudo hostnamectl set-hostname "${{ secrets.USERNAME }}"
             
-            sleep 5
+            sleep 3
             echo "✅ Cleanup complete"
 
 
