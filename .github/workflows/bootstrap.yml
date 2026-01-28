@@ -33,6 +33,8 @@ jobs:
             
             echo "🧹 Cleaning up for idempotent deployment..."
             
+            USERNAME="${{ secrets.USERNAME }}"
+            
             # 1. kubeadm 리셋
             sudo kubeadm reset --force 2>/dev/null || true
             
@@ -46,12 +48,18 @@ jobs:
             # 4. 포트 정리
             sudo fuser -k -9 6443/tcp 2379/tcp 10250/tcp 10259/tcp 10257/tcp 8080/tcp 2>/dev/null || true
             
-            # 5. nologin 방지
-            sudo usermod -s /bin/bash ${{ secrets.USERNAME }} || true
+            # 5. /opt 권한 설정
+            echo "📁 Setting /opt permissions..."
+            sudo mkdir -p /opt
+            sudo chown -R "$USERNAME:$USERNAME" /opt
+            
+            # 6. nologin 방지
+            sudo usermod -s /bin/bash "$USERNAME" || true
             
             sleep 3
             
             echo "✅ Cleanup complete"
+
 
       - name: Setup K8s with Kubespray
         uses: appleboy/ssh-action@master
@@ -290,9 +298,9 @@ jobs:
             
             if [ ! -f "$KUBECONFIG_PATH" ]; then
               mkdir -p "$(dirname "$KUBECONFIG_PATH")"
-              cp /etc/kubernetes/admin.conf "$KUBECONFIG_PATH"
-              chown -R "$USERNAME:$USERNAME" "$KUBECONFIG_PATH"
-              chmod 600 "$KUBECONFIG_PATH"
+              sudo cp /etc/kubernetes/admin.conf "$KUBECONFIG_PATH"
+              sudo chown "$USERNAME:$USERNAME" "$KUBECONFIG_PATH"
+              sudo chmod 600 "$KUBECONFIG_PATH"
               echo "   ✅ Created kubeconfig"
             else
               echo "   ✅ kubeconfig already exists"
