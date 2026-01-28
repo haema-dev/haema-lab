@@ -228,7 +228,7 @@ jobs:
             kube_service_addresses: 10.96.0.0/12
 
             # k8s DNS - Pod
-            kube_apiserver_bind_address: 0.0.0.0
+            kube_apiserver_bind_address: 127.0.0.1
             kube_apiserver_advertise_address: 127.0.0.1
 
             kubelet_deployment_type: host
@@ -247,7 +247,6 @@ jobs:
             apiserver_cert_extra_sans:
               - "localhost"
               - "127.0.0.1"
-              - "0.0.0.0"
               - "$HOST_IP"
               - "kubernetes"
               - "kubernetes.default"
