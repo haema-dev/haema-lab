@@ -208,13 +208,17 @@ jobs:
             kube_apiserver_bind_address: "0.0.0.0"
             
             kubelet_deployment_type: host
-            kubeadm_init_timeout: 600
-            upgrade_cluster_setup_timeout: 600
+            kubeadm_init_timeout: 1800
+            upgrade_cluster_setup_timeout: 1800
             skip_kubelet_systemd_environment_file_checks: true
             
-            kubelet_extra_args: "--cluster-dns=10.96.0.10"
             kube_dns_servers:
               - 10.96.0.10
+            kubelet_cluster_dns: 10.96.0.10
+            kubelet_extra_args: "--cluster-dns=10.96.0.10"
+            
+            kubeconfig_localhost: false
+            kubeconfig_server: "https://$HOST_IP:6443"
             
             containerd_cgroup_driver: systemd
             kubelet_cgroup_driver: systemd
@@ -244,6 +248,8 @@ jobs:
               -i "$INVENTORY_DIR/hosts.yaml" \
               --become \
               --become-method=sudo \
+              -e "kubeconfig_localhost=false" \
+              -e "kubeconfig_server=https://$HOST_IP:6443" \
               -v \
               cluster.yml
             
