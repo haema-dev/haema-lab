@@ -235,6 +235,7 @@ jobs:
             kube_dns_servers:
               - 10.96.0.10
             kubelet_cluster_dns: 10.96.0.10
+            kubelet_extra_args: "--cluster-dns=10.96.0.10 --cluster-domain=cluster.local"
 
             containerd_cgroup_driver: systemd
             kubelet_cgroup_driver: systemd
