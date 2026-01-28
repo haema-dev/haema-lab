@@ -205,7 +205,7 @@ jobs:
             kube_pods_subnet: 10.244.0.0/16
             kube_service_addresses: 10.96.0.0/12
             kube_apiserver_advertise_address: $HOST_IP
-            kube_apiserver_bind_address: "0.0.0.0"
+            kube_apiserver_bind_address: $HOST_IP
             
             kubelet_deployment_type: host
             kubeadm_init_timeout: 1800
