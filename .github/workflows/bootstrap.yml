@@ -29,24 +29,31 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
-            
+      
             echo "🧹 Cleaning up for idempotent deployment..."
             
             # 1. kubeadm 리셋
             sudo kubeadm reset --force 2>/dev/null || true
-            
+
             # 2. kubernetes 설정 삭제
             sudo rm -rf /etc/kubernetes
-            
-            # 3. Kubespray 캐시 삭제
+
+            # 3. kubeconfig 삭제
+            rm -rf ~/.kube/config
+
+            # 4. kubelet & containerd 중단
+            sudo systemctl stop kubelet 2>/dev/null || true
+            sudo systemctl stop containerd 2>/dev/null || true
+
+            # 5. Kubespray 캐시 삭제
             rm -rf /opt/kubespray/.cache
             rm -rf /opt/kubespray
-            
-            # 4. 포트 정리
-            sudo fuser -k -9 6443/tcp 2379/tcp 10250/tcp 10259/tcp 10257/tcp 8080/tcp 2>/dev/null || true
-            
+
+            # 6. 포트 정리
+            sudo fuser -k -9 6443/tcp 2379/tcp 10250/tcp 10259/tcp 10257/tcp 8080/tcp 2379/tcp 2380/tcp 2>/dev/null || true
+
             sleep 3
-            
+
             echo "✅ Cleanup complete"
 
       - name: Setup K8s with Kubespray
