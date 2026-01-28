@@ -227,13 +227,7 @@ jobs:
 
             # 인증서 주체명 설정 (재생성 방지)
             apiserver_cert_extra_sans:
-              - "localhost"
-              - "127.0.0.1"
-              - "$HOST_IP"
-              - "kubernetes"
-              - "kubernetes.default"
-              - "kubernetes.default.svc"
-              - "kubernetes.default.svc.cluster.local"
+              - $HOST_IP
             EOF
 
             echo "✅ Inventory configured"
