@@ -142,7 +142,6 @@ jobs:
               mkdir -p "$KUBESPRAY_HOME"
               git clone --depth 1 --branch "$KUBESPRAY_VERSION" \
                 https://github.com/kubernetes-sigs/kubespray.git "$KUBESPRAY_HOME"
-              chown -R "$USERNAME:$USERNAME" "$KUBESPRAY_HOME"
             fi
             
             # ============================================
@@ -272,12 +271,12 @@ jobs:
             echo "🔑 Patching kubeconfig with HOST_IP..."
             
             if [ -f /etc/kubernetes/admin.conf ]; then
-              sed -i "s|server:.*6443|server: https://$HOST_IP:6443|g" /etc/kubernetes/admin.conf
+              sudo sed -i "s|server:.*6443|server: https://$HOST_IP:6443|g" /etc/kubernetes/admin.conf
               echo "   ✅ /etc/kubernetes/admin.conf patched"
             fi
-            
+
             if [ -f ~/.kube/config ]; then
-              sed -i "s|server:.*6443|server: https://$HOST_IP:6443|g" ~/.kube/config
+              sudo sed -i "s|server:.*6443|server: https://$HOST_IP:6443|g" ~/.kube/config
               echo "   ✅ ~/.kube/config patched"
             fi
             
