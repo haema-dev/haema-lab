@@ -32,10 +32,12 @@
 ## 🛠️ Technology Stack & Tooling
 
 - **Virtualization**: Proxmox VE
-- **Orchestration**: Kubernetes (K8s)
+- **Orchestration**: Kubernetes via Kubespray
+- **Network & Access**: Tailscale (Mesh VPN & Remote Node Access)
 - **CI/CD & GitOps**: GitHub Actions, ArgoCD
 - **Monitoring**: Prometheus & Grafana Stack
 - **MLOps & Serving**: [Ollama (local preprocessing: Gemma-2-3B INT4) / Gemini API (remote generation)]
+
 
 
 ## 🎯 Key Challenges & Tasks
