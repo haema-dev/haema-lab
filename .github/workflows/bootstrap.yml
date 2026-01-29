@@ -43,48 +43,82 @@ jobs:
             sudo usermod -s /bin/bash root || true
             sudo usermod -s /bin/bash "$USERNAME" || true
 
-            # 2. Kubernetes reset
+            # 2. 서비스 중지
+            echo "🛑 Stopping services..."
+            sudo systemctl stop kubelet 2>/dev/null || true
+            sudo systemctl stop etcd 2>/dev/null || true
+            sudo systemctl stop containerd 2>/dev/null || true
+            sudo systemctl disable kubelet 2>/dev/null || true
+            sudo systemctl disable etcd 2>/dev/null || true
+
+            sleep 2
+
+            # 3. 프로세스 강제 종료
+            echo "🔪 Killing processes..."
+            for proc in kubelet apiserver etcd kube-controller-manager kube-scheduler kube-proxy coredns etcd-io containerd; do
+              sudo pkill -9 $proc 2>/dev/null || true
+            done
+
+            sleep 2
+
+            # 4. Kubernetes reset
             echo "🔄 Resetting Kubernetes..."
             sudo kubeadm reset --force 2>/dev/null || true
-            sudo systemctl stop kubelet 2>/dev/null || true
+
+            # 5. 🆕 containerd 캐시 삭제 (이미지 저장소)
+            echo "🗑️  Cleaning containerd cache..."
+            sudo rm -rf /var/lib/containerd 2>/dev/null || true
+            sudo rm -rf /run/containerd 2>/dev/null || true
+
+            # 6. K8s 데이터 삭제
+            echo "🗂️  Cleaning Kubernetes..."
             sudo rm -rf /etc/kubernetes
             sudo rm -rf /var/lib/kubelet
             sudo rm -rf /var/lib/etcd
             sudo rm -rf /var/lib/cni
+            sudo rm -rf /etc/cni/net.d 2>/dev/null || true
+            sudo rm -rf /var/lib/calico 2>/dev/null || true
 
-            # 3. Kubespray cleanup
+            # 7. Kubespray cleanup
             echo "📦 Cleaning Kubespray..."
             [ -d /opt/kubespray ] && sudo rm -rf /opt/kubespray
             [ -d /opt/venv-kubespray ] && sudo rm -rf /opt/venv-kubespray
 
-            # 4. Home directories cleanup
+            # 8. Home directories cleanup
             echo "🏠 Cleaning home directories..."
             sudo rm -rf /home/$USERNAME/.kube
             sudo rm -rf /home/$USERNAME/.ansible
-            sudo rm -rf /home/$USERNAME/.cache/pip
+            sudo rm -rf /home/$USERNAME/.cache/pip 2>/dev/null || true
 
-            # 5. Prepare /opt
+            # 9. Prepare /opt
             echo "📁 Preparing /opt..."
             sudo mkdir -p /opt
             sudo chown -R "$USERNAME:$USERNAME" /opt
 
-            # 6. Configure sudoers
+            # 10. Configure sudoers
             echo "🔐 Configuring sudoers..."
             if ! sudo grep -q "^$USERNAME ALL=(ALL) NOPASSWD: ALL" /etc/sudoers.d/$USERNAME 2>/dev/null; then
               echo "$USERNAME ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/$USERNAME > /dev/null
               sudo chmod 440 /etc/sudoers.d/$USERNAME
             fi
 
-            # 7. Clean ports
+            # 11. Clean ports (재시도 로직)
             echo "🔌 Cleaning ports..."
-            sudo fuser -k -9 6443/tcp 2379/tcp 10250/tcp 10259/tcp 10257/tcp 8080/tcp 2>/dev/null || true
+            max_retries=3
+            for attempt in $(seq 1 $max_retries); do
+              sudo fuser -k -9 6443/tcp 2379/tcp 10250/tcp 10259/tcp 10257/tcp 8080/tcp 2>/dev/null || true
+              sleep 1
+              
+              ports_in_use=$(sudo netstat -tlnp 2>/dev/null | grep -E '6443|2379|10250' | wc -l || echo 0)
+              if [ $ports_in_use -eq 0 ]; then
+                echo "✅ All ports free"
+                break
+              fi
+            done
 
-            # ✅ 여기에 추가
-            echo "🏷️  Setting hostname to USERNAME..."
+            # 12. Hostname 설정
+            echo "🏷️  Setting hostname..."
             sudo hostnamectl set-hostname "${{ secrets.USERNAME }}"
-
-            sleep 3
-            echo "✅ Cleanup complete"
 
             sleep 3
             echo "✅ Cleanup complete"
@@ -92,7 +126,7 @@ jobs:
       # ════════════════════════════════════════
       # Phase 2: Setup (USERNAME)
       # ════════════════════════════════════════
-      - name: Setup K8s with Kubespray
+      - name: 🚀 Setup K8s with Kubespray
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
@@ -232,10 +266,14 @@ jobs:
             upgrade_cluster_setup_timeout: 1800
             skip_kubelet_systemd_environment_file_checks: true
 
+            # 🆕 DNS 명시적 설정
             kube_dns_servers:
               - 10.96.0.10
             kubelet_cluster_dns: 10.96.0.10
             kubelet_extra_args: "--cluster-dns=10.96.0.10 --cluster-domain=cluster.local"
+
+            # 🆕 CoreDNS 서비스 IP 명시
+            dns_cluster_ip: "10.96.0.10"
 
             containerd_cgroup_driver: systemd
             kubelet_cgroup_driver: systemd
