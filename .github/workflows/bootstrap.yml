@@ -32,17 +32,17 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
-            
-            echo "🧹 Cleanup Phase"
+
+            echo "🧹 Cleanup Phase (Enhanced)"
             echo "════════════════════════════════════"
-            
+
             USERNAME="${{ secrets.USERNAME }}"
-            
+
             # 1. User shells restore
             echo "🔑 Restoring user shells..."
             sudo usermod -s /bin/bash ${{ secrets.FIRST_USERNAME }} || true
             sudo usermod -s /bin/bash "$USERNAME" || true
-            
+
             # 2. 모든 서비스/프로세스 중지
             echo "🛑 Stopping all services..."
             sudo systemctl stop kubelet 2>/dev/null || true
@@ -50,62 +50,84 @@ jobs:
             sudo systemctl stop containerd 2>/dev/null || true
             sudo systemctl disable kubelet 2>/dev/null || true
             sudo systemctl disable etcd 2>/dev/null || true
-            
+
+            sleep 2
+
             # 3. 프로세스 강제 종료
             echo "🔪 Killing processes..."
             for proc in kubelet apiserver etcd kube-controller-manager kube-scheduler kube-proxy coredns etcd-io containerd; do
               sudo pkill -9 $proc 2>/dev/null || true
             done
-            
+
+            sleep 2
+
             # 4. Docker/containerd 정리
             echo "🗑️  Cleaning containers..."
             if command -v docker &> /dev/null; then
-              sudo docker ps -aq | xargs -r sudo docker rm -f 2>/dev/null || true
+              sudo docker ps -aq 2>/dev/null | xargs -r sudo docker rm -f 2>/dev/null || true
             fi
             if command -v crictl &> /dev/null; then
               sudo crictl ps -a -q 2>/dev/null | xargs -r sudo crictl rm 2>/dev/null || true
             fi
-            
+
             # 5. Kubernetes reset
             echo "🔄 Resetting Kubernetes..."
             sudo kubeadm reset --force 2>/dev/null || true
-            
-            # 6. 디렉토리 정리
-            echo "🗂️  Cleaning directories..."
-            sudo rm -rf /etc/kubernetes
-            sudo rm -rf /var/lib/kubelet
-            sudo rm -rf /var/lib/etcd
-            sudo rm -rf /var/lib/cni
-            sudo rm -rf /etc/cni/net.d
-            sudo rm -rf /var/lib/calico
-            
-            # 7. Kubespray cleanup
+
+            sleep 2
+
+            # 6. 🆕 강제 디렉토리 정리 (재귀 + force)
+            echo "🗂️  Force cleaning directories..."
+            sudo rm -rf --force /etc/kubernetes 2>/dev/null || true
+            sudo rm -rf --force /var/lib/kubelet 2>/dev/null || true
+            sudo rm -rf --force /var/lib/etcd 2>/dev/null || true
+            sudo rm -rf --force /var/lib/cni 2>/dev/null || true
+            sudo rm -rf --force /etc/cni/net.d 2>/dev/null || true
+            sudo rm -rf --force /var/lib/calico 2>/dev/null || true
+
+            # 7. 🆕 containerd 캐시 정리
+            echo "🧹 Cleaning containerd..."
+            sudo systemctl stop containerd 2>/dev/null || true
+            sudo pkill -9 containerd 2>/dev/null || true
+            sudo rm -rf --force /var/lib/containerd 2>/dev/null || true
+            sudo rm -rf --force /run/containerd 2>/dev/null || true
+
+            sleep 2
+
+            # 8. 🆕 Kubelet 데이터 정리
+            echo "🗑️  Cleaning kubelet data..."
+            sudo rm -rf --force /var/lib/kubelet/pods 2>/dev/null || true
+            sudo rm -rf --force /var/lib/kubelet/pod_resources 2>/dev/null || true
+            sudo rm -rf --force /var/lib/kubelet/device-plugins 2>/dev/null || true
+            sudo rm -rf --force /var/lib/kubelet/kubeadm-flags.env 2>/dev/null || true
+            sudo rm -rf --force /var/lib/kubelet/config.yaml 2>/dev/null || true
+
+            # 9. Kubespray cleanup
             echo "📦 Cleaning Kubespray..."
             [ -d /opt/kubespray ] && sudo rm -rf /opt/kubespray
             [ -d /opt/venv-kubespray ] && sudo rm -rf /opt/venv-kubespray
-            
-            # 8. Home directories cleanup
+
+            # 10. Home directories cleanup
             echo "🏠 Cleaning home directories..."
-            sudo rm -rf /home/$USERNAME/.kube
-            sudo rm -rf /home/$USERNAME/.ansible
-            sudo rm -rf /home/$USERNAME/.cache/pip
-            
-            # 9. Prepare /opt
+            sudo rm -rf /home/$USERNAME/.kube 2>/dev/null || true
+            sudo rm -rf /home/$USERNAME/.ansible 2>/dev/null || true
+            sudo rm -rf /home/$USERNAME/.cache/pip 2>/dev/null || true
+
+            # 11. Prepare /opt
             echo "📁 Preparing /opt..."
             sudo mkdir -p /opt
             sudo chown -R "$USERNAME:$USERNAME" /opt
-            
-            # 10. Configure sudoers
+
+            # 12. Configure sudoers
             echo "🔐 Configuring sudoers..."
             if ! sudo grep -q "^$USERNAME ALL=(ALL) NOPASSWD: ALL" /etc/sudoers.d/$USERNAME 2>/dev/null; then
               echo "$USERNAME ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/$USERNAME > /dev/null
               sudo chmod 440 /etc/sudoers.d/$USERNAME
             fi
-            
-            # 11. 포트 정리 (재시도 로직)
+
+            # 13. 🆕 포트 정리 (재시도)
             echo "🔌 Cleaning ports (with retry)..."
-            
-            max_retries=3
+            max_retries=5
             for attempt in $(seq 1 $max_retries); do
               # 포트 강제 해제
               for port in 6443 2379 10250 10259 10257 8080; do
@@ -115,27 +137,30 @@ jobs:
               # 포트 상태 확인
               ports_in_use=$(sudo netstat -tlnp 2>/dev/null | grep -E '6443|10259|10257' | wc -l || echo 0)
               if [ $ports_in_use -eq 0 ]; then
-                echo "✅ All ports free (attempt $attempt)"
+                echo "✅ All ports free (attempt $attempt/$max_retries)"
                 break
               fi
               
-              if [ $attempt -lt $max_retries ]; then
-                echo "⚠️  Ports still in use, retrying... ($attempt/$max_retries)"
-                sleep 3
-              else
-                echo "⚠️  Warning: Some ports may still be in use, proceeding anyway..."
-              fi
+              echo "⚠️  Ports still in use, retrying... ($attempt/$max_retries)"
+              sleep 2
             done
-            
-            # 🗑️ iptables 정리 제거! (SSH 연결 끊김)
-            
-            # 12. Hostname 설정
+
+            # 14. 🆕 검증: 파일 확인
+            echo "🔍 Verifying cleanup..."
+            if [ ! -d /etc/kubernetes ]; then
+              echo "   ✅ /etc/kubernetes removed"
+            else
+              echo "   ❌ /etc/kubernetes still exists!"
+              ls -la /etc/kubernetes/
+              sudo rm -rf /etc/kubernetes
+            fi
+
+            # 15. Hostname 설정
             echo "🏷️  Setting hostname..."
             sudo hostnamectl set-hostname "${{ secrets.USERNAME }}"
-            
-            sleep 3
-            echo "✅ Cleanup complete"
 
+            sleep 3
+            echo "✅ Enhanced Cleanup complete"
 
       # ════════════════════════════════════════
       # Phase 2: Setup (USERNAME)
@@ -148,22 +173,22 @@ jobs:
           key: ${{ secrets.SSH_USERNAME_PRIVATE_KEY }}
           script: |
             set -e
-            
+
             echo "🚀 Setup Phase"
             echo "════════════════════════════════════"
-            
+
             KUBE_VERSION="1.31.6"
             KUBESPRAY_VERSION="v2.29.0"
             KUBESPRAY_HOME="/opt/kubespray"
             VENV_PATH="/opt/venv-kubespray"
             HOST_IP="${{ secrets.HOST_IP }}"
             USERNAME="${{ secrets.USERNAME }}"
-            
-            
+
+
             # 1️⃣ Cluster health check
             echo ""
             echo "📊 Checking cluster health..."
-            
+
             check_cluster_health() {
               if ! command -v kubectl &> /dev/null; then
                 return 1
@@ -181,15 +206,15 @@ jobs:
               fi
               return 1
             }
-            
+
             if check_cluster_health; then
               echo "✅ Cluster is healthy - skipping setup"
               kubectl get nodes
               exit 0
             fi
-            
+
             echo "⚠️  Cluster not ready, proceeding..."
-            
+
             # 2️⃣ Install dependencies
             echo ""
             echo "📦 Installing dependencies..."
@@ -197,11 +222,11 @@ jobs:
             sudo apt-get install -y -qq \
               python3-pip python3-venv git jq curl \
               2>&1 | grep -v "^Processing\|^done" || true
-            
+
             # 3️⃣ Setup Kubespray (fixed: removed sudo)
             echo ""
             echo "📥 Setting up Kubespray..."
-            
+
             if [ -d "$KUBESPRAY_HOME/.git" ]; then
               CURRENT_VERSION=$(cd "$KUBESPRAY_HOME" && git describe --tags 2>/dev/null || echo "unknown")
               if [ "$CURRENT_VERSION" = "$KUBESPRAY_VERSION" ]; then
@@ -217,33 +242,33 @@ jobs:
               git clone --depth 1 --branch "$KUBESPRAY_VERSION" \
                 https://github.com/kubernetes-sigs/kubespray.git "$KUBESPRAY_HOME"
             fi
-            
+
             # 4️⃣ Python environment
             echo ""
             echo "🐍 Setting up Python environment..."
-            
+
             if [ ! -d "$VENV_PATH" ]; then
               python3 -m venv "$VENV_PATH"
             fi
-            
+
             source "$VENV_PATH/bin/activate"
             pip install -q --upgrade pip
             pip install -q -r "$KUBESPRAY_HOME/requirements.txt"
-            
+
             # 5️⃣ Ansible inventory (fixed: removed sudo mkdir, fixed YAML indentation)
             echo ""
             echo "📋 Configuring Ansible inventory..."
-            
+
             INVENTORY_DIR="$KUBESPRAY_HOME/inventory/mycluster"
-            
+
             if [ -d "$INVENTORY_DIR" ]; then
               BACKUP_DIR="$KUBESPRAY_HOME/inventory/mycluster.backup.$(date +%s)"
               cp -r "$INVENTORY_DIR" "$BACKUP_DIR"
               echo "   ✅ Backed up existing inventory"
             fi
-            
+
             mkdir -p "$INVENTORY_DIR/group_vars/all"
-            
+
             # hosts.yaml (fixed: proper YAML indentation)
             cat > "$INVENTORY_DIR/hosts.yaml" << 'HOSTS'
             all:
@@ -266,7 +291,7 @@ jobs:
                     kube_control_plane:
                     kube_node:
             HOSTS
-            
+
             # all.yml
             cat > "$INVENTORY_DIR/group_vars/all/all.yml" << EOF
             kube_version: "1.31.6"
@@ -301,15 +326,15 @@ jobs:
               - "kubernetes.default.svc"
               - "kubernetes.default.svc.cluster.local"
             EOF
-            
+
             echo "   ✅ Inventory configured"
-            
+
             # 6️⃣ Run Kubespray
             echo ""
             echo "🚀 Running Kubespray as root (15-20 minutes)..."
-            
+
             cd "$KUBESPRAY_HOME"
-            
+
             ansible-playbook \
               -i "$INVENTORY_DIR/hosts.yaml" \
               --become \
@@ -319,49 +344,49 @@ jobs:
               -e "kube_owner=${{ secrets.USERNAME }}" \
               -v \
               cluster.yml
-            
+
             if [ $? -ne 0 ]; then
               echo "❌ Kubespray failed"
               exit 1
             fi
-            
+
             echo "✅ Kubespray completed"
-            
+
             # 7️⃣ Setup kubeconfig (fixed: proper sudo for root-owned files)
             echo ""
             echo "🔑 Setting up kubeconfig..."
-            
+
             KUBECONFIG_PATH="$HOME/.kube/config"
-            
+
             mkdir -p "$(dirname "$KUBECONFIG_PATH")"
-            
+
             # Copy root-owned file with sudo
             sudo cp /etc/kubernetes/admin.conf "$HOME/.kube/admin.conf.tmp"
             sudo chown $(whoami):$(whoami) "$HOME/.kube/admin.conf.tmp"
-            
+
             # Patch server address
             sed -i "s|server:.*6443|server: https://$HOST_IP:6443|g" "$HOME/.kube/admin.conf.tmp"
-            
+
             # Move to final location
             mv "$HOME/.kube/admin.conf.tmp" "$KUBECONFIG_PATH"
-            
+
             sudo chown $(whoami):$(whoami) "$KUBECONFIG_PATH"
             chmod 600 "$KUBECONFIG_PATH"
-            
+
             echo "   ✅ kubeconfig ready"
-            
+
             # 8️⃣ Verify cluster
             echo ""
             echo "✓ Verifying cluster..."
-            
+
             export KUBECONFIG="$KUBECONFIG_PATH"
-            
+
             kubectl cluster-info 2>/dev/null || echo "Cluster initializing..."
             echo ""
             kubectl get nodes || true
             echo ""
             kubectl get pods -n kube-system --no-headers 2>/dev/null | head -5 || true
-            
+
             echo ""
             echo "════════════════════════════════════"
             echo "🎉 Setup Phase Complete!"
@@ -379,34 +404,34 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
-            
+
             echo "✓ Post-Setup Verification"
             echo "════════════════════════════════════"
-            
+
             USERNAME="${{ secrets.USERNAME }}"
-            
+
             # Check shells
             echo "🔍 Checking user shells..."
             ROOT_SHELL=$(grep ^root /etc/passwd | cut -d: -f7)
             USER_SHELL=$(grep ^$USERNAME /etc/passwd | cut -d: -f7)
-            
+
             if [[ "$ROOT_SHELL" == *"nologin"* ]]; then
               sudo usermod -s /bin/bash ${{ secrets.FIRST_USERNAME }}
             fi
-            
+
             if [[ "$USER_SHELL" == *"nologin"* ]]; then
               sudo usermod -s /bin/bash "$USERNAME"
             fi
-            
+
             echo "   root: $ROOT_SHELL"
             echo "   $USERNAME: $USER_SHELL"
-            
+
             # Check ownership
             echo ""
             echo "📂 File ownership:"
             echo "   /opt/kubespray: $(ls -ld /opt/kubespray 2>/dev/null | awk '{print $3, $4}')"
             echo "   /opt/venv-kubespray: $(ls -ld /opt/venv-kubespray 2>/dev/null | awk '{print $3, $4}')"
-            
+
             # Check K8s
             echo ""
             echo "📊 Kubernetes Status:"
@@ -415,6 +440,6 @@ jobs:
             echo "   Nodes: $(kubectl get nodes --no-headers 2>/dev/null | wc -l)"
             echo "   Pods: $(kubectl get pods -n kube-system --no-headers 2>/dev/null | wc -l)"
             K8S_CHECK
-            
+
             echo ""
             echo "✅ Verification complete"
