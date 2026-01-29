@@ -14,7 +14,7 @@
 
 ## 🏛️ System Architecture
 
-![System Architecture Diagram](./system_architecture2.png)
+![System Architecture Diagram](./system_architecture.png)
 
 ## ⚙️ Infrastructure Constraints & Design Decisions
 
