@@ -1,6 +1,6 @@
 # haema's Home Lab
 
-### 📊 Project Roadmap & Variance Analysis (Updated: 2026-01-29)
+## 📊 Project Roadmap & Variance Analysis (Updated: 2026-01-29)
 
 | Stage                        | Planned         | Actual               | Variance | Delay Analysis & Action Items                                      |
 | :--------------------------- | :-------------- | :------------------- | :------: | :----------------------------------------------------------------- |
