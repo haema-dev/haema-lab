@@ -1,12 +1,12 @@
 # haema's Home Lab
 
-### 📊 Project Roadmap & Variance Analysis (Updated: 2026-01-28)
+### 📊 Project Roadmap & Variance Analysis (Updated: 2026-01-29)
 
-| Stage                        | Planned         | Actual              | Variance | Delay Analysis & Action Items                                      |
-| :--------------------------- | :-------------- | :------------------ | :------: | :----------------------------------------------------------------- |
-| **01. System Design**        | Jan 16 - Jan 19 | Jan 16 - Jan 19     |    0d    | **[Complete]** Architecture finalized for fixed hardware baseline. |
-| **02. DevOps & Environment** | Jan 23 - Jan 24 | Jan 26 - Jan 29     |    5d    | **[Cause]** Changes to Kubernetes via Kubespray                    |
-| **03. Model Evaluation**     | Jan 30 - Jan 31 | Jan 30 - **Onging** |    -     | -                                                                  |
+| Stage                        | Planned         | Actual               | Variance | Delay Analysis & Action Items                                      |
+| :--------------------------- | :-------------- | :------------------- | :------: | :----------------------------------------------------------------- |
+| **01. System Design**        | Jan 16 - Jan 19 | Jan 16 - Jan 19      |    0d    | **[Complete]** Architecture finalized for fixed hardware baseline. |
+| **02. DevOps & Environment** | Jan 23 - Jan 24 | Jan 26 - Jan 29      |    5d    | **[Cause]** Changes to Kubernetes via Kubespray                    |
+| **03. Model Evaluation**     | Jan 30 - Jan 31 | Jan 30 - **Ongoing** |    -     | -                                                                  |
 
 > **Current Status:** 🏗️ Stage 03 (Model Evaluation) in progress.
 
