@@ -3,9 +3,9 @@ name: Kubespray K8s
 on:
   workflow_dispatch:
   push:
-    branches: [ master ]
+    branches: [master]
     paths:
-      - '.github/workflows/bootstrap.yml'
+      - ".github/workflows/bootstrap.yml"
 
 jobs:
   setup:
@@ -300,40 +300,17 @@ jobs:
             kube_pods_subnet: 10.244.0.0/16
             kube_service_addresses: 10.96.0.0/12
 
-            # ✅ 명시적 API Server 설정
+            # API Server 설정
             kube_apiserver_bind_address: 127.0.0.1
             kube_apiserver_advertise_address: 127.0.0.1
-            apiserver_endpoint: "https://127.0.0.1:6443"
 
-            # ✅ kubelet 설정 (DNS 명시)
             kubelet_deployment_type: host
             kubelet_cgroup_driver: systemd
-            kubelet_extra_args: "--cluster-dns=10.96.0.10 --cluster-domain=cluster.local --cgroup-driver=systemd"
-            kubelet_cluster_dns:
-              - 10.96.0.10
 
-            # ✅ Pause image 설정
-            sandbox_image_repo: registry.k8s.io
-            sandbox_image_tag: "3.10"
+            # CNI 없이 진행 (나중에 Calico 설치)
+            kube_network_plugin: none
 
-            # ✅ etcd 설정
-            etcd_deployment_type: host
-            etcd_extra_args:
-              - --listen-client-urls=http://127.0.0.1:2379
-              - --advertise-client-urls=http://127.0.0.1:2379
-
-            # ✅ containerd 설정
-            containerd_cgroup_driver: systemd
-            containerd_extra_runtime_args: []
-
-            # ✅ kubeadm 타임아웃
-            kubeadm_init_timeout: 1800s
-
-            # ✅ CNI
-            kube_network_plugin: calico
-            calico_version: 3.30.0
-
-            # ✅ 인증서 SAN
+            # 인증서 SAN
             apiserver_cert_extra_sans:
               - localhost
               - 127.0.0.1
