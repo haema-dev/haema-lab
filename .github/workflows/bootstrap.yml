@@ -331,7 +331,7 @@ jobs:
 
             # ✅ CNI
             kube_network_plugin: calico
-            calico_version: v3.28.0
+            calico_version: "v3.28.0"
 
             # ✅ 인증서 SAN
             apiserver_cert_extra_sans:
