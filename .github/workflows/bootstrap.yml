@@ -294,31 +294,29 @@ jobs:
 
             # all.yml
             cat > "$INVENTORY_DIR/group_vars/all/all.yml" << EOF
-            # ✅ 기본 설정
             kube_version: "1.31.6"
             container_manager: containerd
             dns_mode: coredns
             kube_pods_subnet: 10.244.0.0/16
             kube_service_addresses: 10.96.0.0/12
 
-            # ✅ API Server (명시적)
             kube_apiserver_bind_address: 127.0.0.1
             kube_apiserver_advertise_address: 127.0.0.1
 
-            # ✅ Kubelet (명시적 DNS)
             kubelet_deployment_type: host
             kubelet_cgroup_driver: systemd
             kubelet_cluster_dns:
               - 10.96.0.10
+            kubelet_extra_args: "--cluster-dns=10.96.0.10 --cluster-domain=cluster.local"
 
-            # ✅ Pause image (명시적)
             sandbox_image_repo: registry.k8s.io
             sandbox_image_tag: "3.10"
 
-            # ✅ CNI 없음
+            kubeadm_init_timeout: "600s"
+            skip_kubelet_systemd_environment_file_checks: true
+
             kube_network_plugin: none
 
-            # ✅ 인증서
             apiserver_cert_extra_sans:
               - localhost
               - 127.0.0.1
