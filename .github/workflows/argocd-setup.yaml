@@ -29,21 +29,24 @@ jobs:
             set -e
             export KUBECONFIG=$HOME/.kube/config
 
-            # 1. ArgoCD 설치 (멱등성 유지 및 서버 측 반영)
+            # 1. ArgoCD 설치
             echo "🚀 Installing ArgoCD..."
-            kubectl create namespace argocd || true
             kubectl apply --server-side --force-conflicts -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
-            # 2. 파드가 실제로 API에 보일 때까지 대기 (중요)
-            echo "⏳ Waiting for ArgoCD pods to appear..."
-            until [ "$(kubectl get pods -n argocd --no-headers 2>/dev/null | wc -l)" -gt 0 ]; do
-              echo "Still waiting for pods to be created..."
+            # 2. ArgoCD 서버가 API에 등록될 때까지 잠시 대기
+            echo "⏳ Waiting for ArgoCD Deployment to appear..."
+            until kubectl get deployment argocd-server -n argocd &>/dev/null; do
+              echo "Still waiting for argocd-server deployment object..."
               sleep 5
             done
-            
-            # 3. 파드가 Ready 상태가 될 때까지 대기
-            echo "⏳ Waiting for ArgoCD components to be Ready..."
-            kubectl wait --for=condition=Ready pod -l app.kubernetes.io/part-of=argocd -n argocd --timeout=300s
+
+            # 3. Deployment의 롤아웃 상태 확인 (이게 파드 wait보다 훨씬 정확합니다)
+            echo "⏳ Waiting for ArgoCD Server to be Ready..."
+            kubectl rollout status deployment/argocd-server -n argocd --timeout=300s
+
+            # 4. 나머지 컴포넌트들도 준비될 때까지 최종 대기
+            echo "⏳ Final check for all pods..."
+            sleep 10
 
             # 4. Grafana Secret 주입
             echo "🔐 Injecting Grafana Credentials..."
