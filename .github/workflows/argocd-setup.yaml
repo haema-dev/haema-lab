@@ -29,11 +29,14 @@ jobs:
             set -e
             export KUBECONFIG=$HOME/.kube/config
 
-            # 1. ArgoCD 설치
-            echo "🚀 Installing ArgoCD..."
+            # 1. 네임스페이스 생성 및 ArgoCD 설치
+            echo "🚀 Preparing Environment..."
+            kubectl create namespace argocd || true # 방 만들기
+            
+            echo "🚀 Installing ArgoCD Components..."
             kubectl apply --server-side --force-conflicts -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
-            # 2. ArgoCD 서버가 API에 등록될 때까지 잠시 대기
+            # 2. ArgoCD 서버가 API에 등록될 때까지 대기
             echo "⏳ Waiting for ArgoCD Deployment to appear..."
             until kubectl get deployment argocd-server -n argocd &>/dev/null; do
               echo "Still waiting for argocd-server deployment object..."
