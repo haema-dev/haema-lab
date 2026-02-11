@@ -47,28 +47,30 @@
 ## 📁 Folder Architecture
 ```bash
 repo/
-  ├── gateway/                        # Kotlin + Spring Cloud Gateway
-  │     ├── src/...
-  │     ├── build.gradle.kts
-  │     └── k8s/                      # deployment.yaml
-  │
-  ├── apps/                           # Django + Airflow + Backend Service
-  │     ├── main.py
-  │     ├── requirements.txt
-  │     └── k8s/                      # deployment.yaml
-  │
-  ├── models/                         # FastAPI RAG + Ollama Proxy
-  │     ├── main.py                   # pgvector + Ollama proxy
-  │     ├── requirements.txt
-  │     └── k8s/                      # deployment.yaml
-  │
-  ├── infra/
-  │     ├── argocd-redis.yaml         # k8s + redis
-  │     └── argocd-apps.yaml          # k8s + apps
-  │
   ├── .github/workflows/
-  │               └── bootstrap.yml   # Kubespray → k8s + Ansible
-  │               └── monitoring.yml  # ArgoCD + Monitoring
+  │             ├── bootstrap.yml     # Kubespray → k8s + Ansible
+  │             ├── argocd-setup.yml  # ArgoCD Install
+  │             ├── deploy-gateway.yml
+  │             ├── deploy-backend.yml
+  │             ├── deploy-front.yml
+  │             └── deploy-models.yml
+  │
+  ├── apps/
+  │     ├── gateway/    # Kotlin + Spring
+  │     ├── frontend/   # Typescript + React
+  │     ├── backend/    # Python + Django
+  │     └── models/     # Python + FastAPI
+  │
+  ├── argocd/
+  │     └── root-app.yaml
+  │
+  ├── manifests/
+  │     ├── gateway/    # Kotlin + Spring
+  │     ├── frontend/   # Typescript + React
+  │     ├── backend/    # Python + Django
+  │     ├── models/     # Python + FastAPI
+  │     └── infra/      # Prometheus
+  │
   └── README.md
 ```
 

@@ -28,7 +28,9 @@ dependencies {
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 	implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor")
 	implementation("org.springframework.cloud:spring-cloud-starter-gateway-server-webflux")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin") // Kotlin JSON
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")    // Kotlin JSON
+    implementation("io.micrometer:micrometer-registry-prometheus")          // Exposing Metrics
+    developmentOnly("org.springframework.boot:spring-boot-devtools")        // Hot restart
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("io.projectreactor:reactor-test")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")

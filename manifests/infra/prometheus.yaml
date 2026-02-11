@@ -1,0 +1,41 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/argoproj/argo-cd/master/manifests/crds/application-crd.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prometheus-stack
+  namespace: argocd
+spec:
+  project: default
+  source:
+    chart: kube-prometheus-stack
+    repoURL: https://prometheus-community.github.io/helm-charts
+    targetRevision: 81.x.x # 2026년 2월 기준 최신 안정화 버전
+    helm:
+      values: |
+        grafana:
+          admin:
+            # GitHub Actions에서 생성한 Secret을 참조합니다
+            existingSecret: "grafana-admin-credentials"
+            passwordKey: "admin-password"
+          persistence:
+            enabled: true # 재시작해도 대시보드가 유지되도록 설정
+            size: 5Gi
+        prometheus:
+          prometheusSpec:
+            retention: 15d # 데이터 보관 기간
+            storageSpec:
+              volumeClaimTemplate:
+                spec:
+                  accessModes: ["ReadWriteOnce"]
+                  resources:
+                    requests:
+                      storage: 10Gi # 지표 데이터 저장용량
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true # 네임스페이스가 없으면 자동 생성
