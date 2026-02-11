@@ -2,10 +2,10 @@ name: "Step 1: Kubespray K8s"
 
 on:
   workflow_dispatch:
-  # push:
-  #   branches: [ master ]
-  #   paths:
-  #     - ".github/workflows/bootstrap.yml"
+  push:
+    branches: [ master ]
+    paths:
+      - ".github/workflows/bootstrap.yml"
 
 jobs:
   setup:
@@ -260,6 +260,10 @@ jobs:
             dns_mode: coredns
             kube_pods_subnet: 10.244.0.0/16
             kube_service_addresses: 10.96.0.0/12
+
+            # 🚨 [추가] 테일스케일 MTU(1280)에 맞추기 위한 설정
+            calico_mtu: 1220
+            veth_mtu: 1220
 
             kubelet_deployment_type: host
             kubeadm_init_timeout: 1800
