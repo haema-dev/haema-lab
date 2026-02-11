@@ -29,7 +29,7 @@ jobs:
         with:
           host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
           username: ${{ secrets.FIRST_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY_GITHUB }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
 

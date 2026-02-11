@@ -27,7 +27,7 @@ jobs:
         with:
           host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }} # VM 2(K8s)의 IP
           username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY_GITHUB }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
             export KUBECONFIG=$HOME/.kube/config
