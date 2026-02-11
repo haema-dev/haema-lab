@@ -29,41 +29,37 @@ jobs:
             set -e
             export KUBECONFIG=$HOME/.kube/config
 
-            # 1. 네임스페이스 생성 및 ArgoCD 설치
-            echo "🚀 Preparing Environment..."
-            kubectl create namespace argocd || true # 방 만들기
+            echo "🧹 Phase 1: Deep Clean"
+            # 1. 기존 네임스페이스 삭제 시도
+            kubectl delete ns argocd --timeout=60s || true
             
-            echo "🚀 Installing ArgoCD Components..."
-            kubectl apply --server-side --force-conflicts -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-
-            # 2. ArgoCD 서버가 API에 등록될 때까지 대기
-            echo "⏳ Waiting for ArgoCD Deployment to appear..."
-            until kubectl get deployment argocd-server -n argocd &>/dev/null; do
-              echo "Still waiting for argocd-server deployment object..."
+            # 2. 네임스페이스가 완전히 사라질 때까지 대기 (매우 중요)
+            echo "⏳ Waiting for old namespace to be completely gone..."
+            while kubectl get ns argocd &>/dev/null; do
+              echo "Namespace still terminating..."
               sleep 5
             done
 
-            # 3. Deployment의 롤아웃 상태 확인 (이게 파드 wait보다 훨씬 정확합니다)
-            echo "⏳ Waiting for ArgoCD Server to be Ready..."
+            echo "🚀 Phase 2: Fresh Install"
+            # 3. 깨끗한 상태에서 다시 생성
+            kubectl create namespace argocd
+            
+            # 4. ArgoCD 설치 (버전 고정으로 안정성 확보)
+            kubectl apply --server-side --force-conflicts -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.10.4/manifests/install.yaml
+
+            # 5. 핵심 시크릿(Redis Password)이 생성되었는지 즉시 확인
+            echo "🔍 Verifying critical secrets..."
+            for i in {1..10}; do
+              if kubectl get secret argocd-redis -n argocd &>/dev/null; then
+                echo "✅ argocd-redis secret found!"
+                break
+              fi
+              echo "Waiting for secrets to be generated ($i/10)..."
+              sleep 5
+            done
+
+            # 6. 서버 롤아웃 대기
+            echo "⏳ Waiting for ArgoCD Server Rollout..."
             kubectl rollout status deployment/argocd-server -n argocd --timeout=300s
 
-            # 4. 나머지 컴포넌트들도 준비될 때까지 최종 대기
-            echo "⏳ Final check for all pods..."
-            sleep 10
-
-            # 4. Grafana Secret 주입
-            echo "🔐 Injecting Grafana Credentials..."
-            kubectl create namespace monitoring || true
-            kubectl create secret generic grafana-admin-credentials \
-              --from-literal=admin-password='${{ secrets.GRAFANA_PASSWORD }}' \
-              -n monitoring \
-              --dry-run=client -o yaml | kubectl apply -f -
-
-            # 5. Root Application 등록
-            echo "📂 Applying Root Application..."
-            REPO_OWNER=$(echo "${{ github.repository }}" | cut -d'/' -f1)
-            REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
-            
-            curl -s https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/master/argocd/root-app.yaml | kubectl apply -f -
-
-            echo "✅ ArgoCD Setup & Root App Registration Complete!"
+            echo "✅ ArgoCD Re-install Complete!"
