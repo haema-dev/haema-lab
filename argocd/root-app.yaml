@@ -10,7 +10,7 @@ spec:
     # 본인의 GitHub 리포지토리 주소로 수정하세요
     repoURL: https://github.com/haema-dev/haema-lab.git
     targetRevision: master
-    path: manifests # 하위 모든 폴더를 감시합니다
+    path: manifests/infra # 하위 모든 폴더를 감시합니다
     directory:
       recurse: true # [중요] 하위 폴더까지 다 뒤집니다
   destination:

@@ -30,36 +30,46 @@ jobs:
             export KUBECONFIG=$HOME/.kube/config
 
             echo "🧹 Phase 1: Deep Clean"
-            # 1. 기존 네임스페이스 삭제 시도
             kubectl delete ns argocd --timeout=60s || true
-            
-            # 2. 네임스페이스가 완전히 사라질 때까지 대기 (매우 중요)
-            echo "⏳ Waiting for old namespace to be completely gone..."
-            while kubectl get ns argocd &>/dev/null; do
-              echo "Namespace still terminating..."
-              sleep 5
-            done
+            while kubectl get ns argocd &>/dev/null; do sleep 5; done
 
             echo "🚀 Phase 2: Fresh Install"
-            # 3. 깨끗한 상태에서 다시 생성
-            kubectl create namespace argocd
+            # 0. StorageClass 설치 (기초 공사)
+            # 이게 없으면 프로메테우스의 PVC(10Gi)를 할당할 수 없어 배포가 실패합니다.
+            echo "📦 Installing Local Path Provisioner..."
+            kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
             
-            # 4. ArgoCD 설치 (버전 고정으로 안정성 확보)
+            # 설치된 local-path를 기본 저장소(Default)로 지정
+            kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+
+            # 1. 네임스페이스 생성
+            kubectl create namespace argocd || true
+            
+            # 2. ArgoCD 설치 (버전 고정)
             kubectl apply --server-side --force-conflicts -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.10.4/manifests/install.yaml
 
-            # 5. 핵심 시크릿(Redis Password)이 생성되었는지 즉시 확인
-            echo "🔍 Verifying critical secrets..."
-            for i in {1..10}; do
-              if kubectl get secret argocd-redis -n argocd &>/dev/null; then
-                echo "✅ argocd-redis secret found!"
-                break
-              fi
-              echo "Waiting for secrets to be generated ($i/10)..."
-              sleep 5
-            done
+            # 3. 🚨 [핵심] 누락 방지를 위한 Redis Secret 강제 생성
+            echo "🔐 Injecting ArgoCD Redis Secret..."
+            kubectl create secret generic argocd-redis \
+              -n argocd --from-literal=auth='' \
+              --dry-run=client -o yaml | kubectl apply -f -
 
-            # 6. 서버 롤아웃 대기
+            # 4. 🔐 [핵심] Prometheus용 Grafana Secret 주입
+            echo "🔐 Injecting Grafana Credentials for Prometheus..."
+            kubectl create namespace monitoring || true
+            kubectl create secret generic grafana-admin-credentials \
+              -n monitoring \
+              --from-literal=admin-password='${{ secrets.GRAFANA_PASSWORD }}' \
+              --dry-run=client -o yaml | kubectl apply -f -
+
+            # 5. ArgoCD 서버 대기 (타임아웃 10분 연장)
             echo "⏳ Waiting for ArgoCD Server Rollout..."
-            kubectl rollout status deployment/argocd-server -n argocd --timeout=300s
+            kubectl rollout status deployment/argocd-server -n argocd --timeout=600s
 
-            echo "✅ ArgoCD Re-install Complete!"
+            # 6. 📂 Root Application 등록 (Prometheus 포함 모든 앱의 시작점)
+            echo "📂 Applying Root Application..."
+            REPO_OWNER=$(echo "${{ github.repository }}" | cut -d'/' -f1)
+            REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+            curl -s https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/master/argocd/root-app.yaml | kubectl apply -f -
+
+            echo "✅ All Setup Complete!"
