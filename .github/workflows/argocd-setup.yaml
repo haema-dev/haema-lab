@@ -24,37 +24,49 @@ jobs:
         with:
           host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
           username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_USERNAME_PRIVATE_KEY }} # Phase 2 전용 키
+          key: ${{ secrets.SSH_USERNAME_PRIVATE_KEY }}
           script: |
             set -e
-            export KUBECONFIG=$HOME/.kube/config #
+            export KUBECONFIG=$HOME/.kube/config
 
-            # 1. ArgoCD 설치 (Server-Side Apply로 주석 크기 제한 우회)
+            # 1. ArgoCD 설치 (멱등성 유지 및 서버 측 반영)
             echo "🚀 Installing ArgoCD..."
             kubectl create namespace argocd || true
-            kubectl apply --server-side --force-conflicts -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml #
+            kubectl apply --server-side --force-conflicts -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
-            # 2. ArgoCD 파드 생성 및 준비 대기
-            echo "⏳ Waiting for pods to be created..."
-            sleep 20 # 컨트롤러가 파드를 생성할 시간 확보
+            # 2. 파드가 실제로 API에 보일 때까지 대기 (중요)
+            echo "⏳ Waiting for ArgoCD pods to appear..."
+            # 최대 2분 동안 5초마다 파드 존재 여부 확인
+            for i in {1..24}; do
+              if kubectl get pods -n argocd -l app.kubernetes.io/part-of=argocd 2>/dev/null | grep -q "."; then
+                echo "✅ Pods detected! Proceeding to wait for Ready state..."
+                break
+              fi
+              if [ $i -eq 24 ]; then
+                echo "❌ Timeout waiting for pods to appear"
+                exit 1
+              fi
+              echo "Still waiting for pods to be created ($i/24)..."
+              sleep 5
+            done
             
+            # 3. 파드가 Ready 상태가 될 때까지 대기
             echo "⏳ Waiting for ArgoCD components to be Ready..."
-            kubectl wait --for=condition=Ready pod -l app.kubernetes.io/part-of=argocd -n argocd --timeout=300s #
+            kubectl wait --for=condition=Ready pod -l app.kubernetes.io/part-of=argocd -n argocd --timeout=300s
 
-            # 3. Grafana Secret 주입 (Monitoring 네임스페이스)
+            # 4. Grafana Secret 주입
             echo "🔐 Injecting Grafana Credentials..."
             kubectl create namespace monitoring || true
             kubectl create secret generic grafana-admin-credentials \
               --from-literal=admin-password='${{ secrets.GRAFANA_PASSWORD }}' \
               -n monitoring \
-              --dry-run=client -o yaml | kubectl apply -f - #
+              --dry-run=client -o yaml | kubectl apply -f -
 
-            # 4. Root Application 등록 (GitOps 시작점)
+            # 5. Root Application 등록
             echo "📂 Applying Root Application..."
-            REPO_OWNER=$(echo "${{ github.repository }}" | cut -d'/' -f1) #
-            REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2) #
+            REPO_OWNER=$(echo "${{ github.repository }}" | cut -d'/' -f1)
+            REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
             
-            #의 설정을 기반으로 전체 매니페스트 감시 시작
-            curl -s https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/master/argocd/root-app.yaml | kubectl apply -f - #
+            curl -s https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/master/argocd/root-app.yaml | kubectl apply -f -
 
             echo "✅ ArgoCD Setup & Root App Registration Complete!"
