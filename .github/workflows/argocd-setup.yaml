@@ -36,17 +36,8 @@ jobs:
 
             # 2. 파드가 실제로 API에 보일 때까지 대기 (중요)
             echo "⏳ Waiting for ArgoCD pods to appear..."
-            # 최대 2분 동안 5초마다 파드 존재 여부 확인
-            for i in {1..24}; do
-              if kubectl get pods -n argocd -l app.kubernetes.io/part-of=argocd 2>/dev/null | grep -q "."; then
-                echo "✅ Pods detected! Proceeding to wait for Ready state..."
-                break
-              fi
-              if [ $i -eq 24 ]; then
-                echo "❌ Timeout waiting for pods to appear"
-                exit 1
-              fi
-              echo "Still waiting for pods to be created ($i/24)..."
+            until [ "$(kubectl get pods -n argocd --no-headers 2>/dev/null | wc -l)" -gt 0 ]; do
+              echo "Still waiting for pods to be created..."
               sleep 5
             done
             
