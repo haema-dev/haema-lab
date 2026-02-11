@@ -16,23 +16,23 @@ jobs:
       - name: 🌎 Connect to Tailscale
         uses: tailscale/github-action@v2
         with:
-        #   oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
-        #   oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
-          version: 1.94.1 # 2026년 최신 버전 유지
+          version: 1.94.1
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
-        #   tags: ${{ secrets.TAILSCALE_AUTH_TAGS }}
 
       - name: 🏗️ Install ArgoCD & Register Root App
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }} # VM 2(K8s)의 IP
+          host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
           username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          # 🚨 중요: bootstrap.yml의 Phase 2에서 등록한 전용 키를 사용해야 합니다.
+          key: ${{ secrets.SSH_USERNAME_PRIVATE_KEY }} 
           script: |
             set -e
+            # bootstrap.yml에서 설정한 KUBECONFIG 경로를 명시합니다.
             export KUBECONFIG=$HOME/.kube/config
 
             # 1. ArgoCD 설치
+            echo "🚀 Installing ArgoCD..."
             kubectl create namespace argocd || true
             kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
@@ -41,15 +41,19 @@ jobs:
             kubectl wait --for=condition=Ready pod -l app.kubernetes.io/part-of=argocd -n argocd --timeout=300s
 
             # 3. Grafana Secret 주입 (Monitoring 네임스페이스)
+            echo "🔐 Injecting Grafana Credentials..."
             kubectl create namespace monitoring || true
             kubectl create secret generic grafana-admin-credentials \
               --from-literal=admin-password='${{ secrets.GRAFANA_PASSWORD }}' \
               -n monitoring \
               --dry-run=client -o yaml | kubectl apply -f -
 
-            # 4. Root Application 등록 (설계하신 argocd/ 폴더 참조)
+            # 4. Root Application 등록
             echo "📂 Applying Root Application..."
-            # curl 대신 로컬에 체크아웃된 파일을 직접 복사하거나 GitHub 주소에서 직접 가져옵니다.
-            curl -s https://raw.githubusercontent.com/${{ github.repository }}/master/argocd/root-app.yaml | kubectl apply -f -
+            # 변수를 활용하여 현재 리포지토리의 master 브랜치에서 root-app.yaml을 가져옵니다.
+            REPO_OWNER=$(echo "${{ github.repository }}" | cut -d'/' -f1)
+            REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+            
+            curl -s https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/master/argocd/root-app.yaml | kubectl apply -f -
 
             echo "✅ ArgoCD Setup & Root App Registration Complete!"
