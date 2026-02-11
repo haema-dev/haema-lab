@@ -1,0 +1,55 @@
+name: "Step 2: ArgoCD Bootstrapping"
+
+on:
+  workflow_dispatch:
+  # push:
+  #   branches: [ master ]
+  #   paths:
+  #     - ".github/workflows/argocd-setup.yaml"
+
+jobs:
+  setup-argocd:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 🌎 Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+        #   oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
+        #   oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
+          version: 1.94.1 # 2026년 최신 버전 유지
+          authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
+        #   tags: ${{ secrets.TAILSCALE_AUTH_TAGS }}
+
+      - name: 🏗️ Install ArgoCD & Register Root App
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }} # VM 2(K8s)의 IP
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY_GITHUB }}
+          script: |
+            set -e
+            export KUBECONFIG=$HOME/.kube/config
+
+            # 1. ArgoCD 설치
+            kubectl create namespace argocd || true
+            kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+            # 2. ArgoCD 대기 (Ready 상태 확인)
+            echo "⏳ Waiting for ArgoCD components..."
+            kubectl wait --for=condition=Ready pod -l app.kubernetes.io/part-of=argocd -n argocd --timeout=300s
+
+            # 3. Grafana Secret 주입 (Monitoring 네임스페이스)
+            kubectl create namespace monitoring || true
+            kubectl create secret generic grafana-admin-credentials \
+              --from-literal=admin-password='${{ secrets.GRAFANA_PASSWORD }}' \
+              -n monitoring \
+              --dry-run=client -o yaml | kubectl apply -f -
+
+            # 4. Root Application 등록 (설계하신 argocd/ 폴더 참조)
+            echo "📂 Applying Root Application..."
+            # curl 대신 로컬에 체크아웃된 파일을 직접 복사하거나 GitHub 주소에서 직접 가져옵니다.
+            curl -s https://raw.githubusercontent.com/${{ github.repository }}/master/argocd/root-app.yaml | kubectl apply -f -
+
+            echo "✅ ArgoCD Setup & Root App Registration Complete!"

@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: way
+management:
+  endpoints:
+    web:
+      exposure:
+        # health: K8s Liveness/Readiness Probe용
+        # prometheus: 메트릭 수집용
+        # gateway: 현재 설정된 라우팅 정보 확인용 (디버깅 필수)
+        include: "health,prometheus,gateway"
+  endpoint:
+    gateway:
+      # 보안을 위해 'read-only' 설정을 권장합니다 (동적 수정 차단)
+      access: read-only
+    health:
+      # K8s Probes를 위한 상세 정보 표시 설정
+      probes:
+        enabled: true
