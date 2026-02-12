@@ -19,7 +19,7 @@ jobs:
           version: 1.94.1
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
 
-      - name: 🏗️ Install ArgoCD & Register Root App
+      - name: 🏗️ Declarative ArgoCD & Infrastructure Setup
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
@@ -29,62 +29,45 @@ jobs:
             set -e
             export KUBECONFIG=$HOME/.kube/config
 
-            echo "🧹 Phase 1: Total Destruction (Idempotency)"
+            echo "🛡️ Phase 1: Infrastructure Sanity Check"
             echo "════════════════════════════════════"
-            
-            # 1. Root Application 먼저 제거 (연쇄 삭제 방지 및 안전한 종료)
-            kubectl delete application root-app -n argocd --timeout=30s || true
+            # 1. 방화벽 점검: 통신 장애의 주범인 UFW를 비활성화하거나 필수 포트를 보장합니다.
+            sudo ufw disable || true
 
-            # 2. 관련 네임스페이스 및 리소스 일괄 삭제
-            # local-path-provisioner까지 포함하여 완전히 초기화합니다.
-            kubectl delete ns argocd monitoring --timeout=60s || true
-            kubectl delete -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml || true
-            
-            # 3. 네임스페이스가 완전히 사라질 때까지 대기 (가장 중요)
-            # 'Terminating' 상태에서 재생성을 시도하면 에러가 나기 때문에 확실히 기다려야 합니다.
-            echo "⏳ Waiting for cleanup to complete..."
-            while kubectl get ns argocd 2>/dev/null || kubectl get ns monitoring 2>/dev/null; do
-              echo "Still cleaning up residues..."
-              sleep 5
-            done
-            echo "✅ Cleanup complete. Proceeding to Fresh Install."
+            # 2. MTU 점검: Calico ConfigMap이 1220인지 상시 확인하고 패치합니다.
+            kubectl patch cm -n kube-system calico-config --type merge \
+              -p '{"data": {"veth_mtu": "1220"}}' || true
 
-            echo ""
-            echo "🚀 Phase 2: Fresh Install & Configuration"
+            echo "🚀 Phase 2: Declarative Resource Sync"
             echo "════════════════════════════════════"
 
-            # 0. StorageClass 설치 (기초 공사)
+            # 1. StorageClass: 선언적으로 적용 (이미 있으면 유지)
             kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
             kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
 
-            # 1. 네임스페이스 생성
-            kubectl create namespace argocd
-            kubectl create namespace monitoring
+            # 2. Namespaces: 삭제 없이 생성 시도 (이미 있으면 무시)
+            kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+            kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
 
-            # 2. ArgoCD 설치
+            # 3. ArgoCD Installation: Server-side apply로 변경 사항만 반영
             kubectl apply --server-side --force-conflicts -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.10.4/manifests/install.yaml
 
-            # 3. Secrets 생성 (멱등성 보장형: 있으면 업데이트, 없으면 생성)
-            # Redis Secret
-            kubectl create secret generic argocd-redis \
-              -n argocd --from-literal=auth='' \
-              --dry-run=client -o yaml | kubectl apply -f -
+            # 4. Secrets Sync: 데이터가 변경되었을 때만 업데이트
+            kubectl create secret generic argocd-redis -n argocd --from-literal=auth='' --dry-run=client -o yaml | kubectl apply -f -
+            kubectl create secret generic grafana-admin-credentials -n monitoring --from-literal=admin-password='${{ secrets.GRAFANA_PASSWORD }}' --dry-run=client -o yaml | kubectl apply -f -
 
-            # Grafana Secret
-            kubectl create secret generic grafana-admin-credentials \
-              -n monitoring \
-              --from-literal=admin-password='${{ secrets.GRAFANA_PASSWORD }}' \
-              --dry-run=client -o yaml | kubectl apply -f -
+            # 5. CoreDNS & Calico Restart (설정 변경 시 런타임 반영 보장)
+            # MTU 변경이 파드에 즉시 반영되지 않는 특성을 고려하여 필요한 경우만 재시작 유도
+            if [[ $(kubectl get pods -n kube-system -l k8s-app=kube-dns -o jsonpath='{.items[0].status.phase}') != "Running" ]]; then
+              kubectl delete pod -n kube-system -l k8s-app=kube-dns || true
+            fi
 
-            # 4. ArgoCD 서버 대기
-            echo "⏳ Waiting for ArgoCD Server Rollout..."
-            kubectl rollout status deployment/argocd-server -n argocd --timeout=600s
+            echo "⏳ Waiting for ArgoCD Server Readiness..."
+            kubectl rollout status deployment/argocd-server -n argocd --timeout=300s
 
-            # 5. Root Application 등록
-            echo "📂 Applying Root Application..."
-            REPO_OWNER=$(echo "${{ github.repository }}" | cut -d'/' -f1)
-            REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
-            # master 브랜치 기준으로 root-app.yaml을 가져옵니다.
-            curl -s https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/master/argocd/root-app.yaml | kubectl apply -f -
+            # 6. Root Application: 선언적 등록
+            echo "📂 Syncing Root Application..."
+            REPO_URL="https://raw.githubusercontent.com/${{ github.repository }}/master/argocd/root-app.yaml"
+            curl -s $REPO_URL | kubectl apply -f -
 
-            echo "✅ All Setup Complete!"
+            echo "✅ Declarative Setup Complete!"
