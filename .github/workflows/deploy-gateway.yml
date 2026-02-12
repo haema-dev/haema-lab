@@ -1,6 +1,7 @@
 name: "Step4-gateway: Deploy Spring Cloud Gateway to GHCR"
 
 on:
+  workflow_dispatch:
   push:
     branches: [ master ]
     paths:
