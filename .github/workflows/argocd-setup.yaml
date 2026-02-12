@@ -9,11 +9,21 @@ jobs:
       - name: 📂 Checkout Repository
         uses: actions/checkout@v4
 
+
+      - name: 📖 Read Application Manifest
+        id: read_file
+        run: |
+          CONTENT=$(cat manifests/argocd-app.yaml)
+          echo "ROOT_APP_CONTENT<<EOF" >> $GITHUB_ENV
+          echo "$CONTENT" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+
       - name: 🌎 Connect to Tailscale
         uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
-          
+
 
       - name: 🏗️ Install ArgoCD & Apply Root App
         uses: appleboy/ssh-action@master
@@ -21,7 +31,7 @@ jobs:
           host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_USERNAME_PRIVATE_KEY }}
-          envs: ROOT_APP_CONTENT # 위에서 읽은 파일 내용을 전달
+          envs: ROOT_APP_CONTENT
           script: |
             set -e
             export KUBECONFIG=$HOME/.kube/config
