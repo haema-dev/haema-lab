@@ -63,6 +63,7 @@ repo/
   │     └── models/     # Python + FastAPI
   │
   ├── argocd/
+  │     ├── monitoring.yaml
   │     └── root-app.yaml
   │
   ├── manifests/
