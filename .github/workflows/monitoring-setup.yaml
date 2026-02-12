@@ -25,49 +25,63 @@ jobs:
             set -e
             export KUBECONFIG=$HOME/.kube/config
 
-            echo "🔐 Setup Monitoring Secrets"
-            kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
-            kubectl create secret generic grafana-admin-credentials \
-              -n monitoring --from-literal=admin-password='${{ secrets.GRAFANA_PASSWORD }}' \
-              --dry-run=client -o yaml | kubectl apply -f -
+            echo "🛡️ Phase 1: Infrastructure Fix"
+            # 1. 방화벽 비활성화 (통신 장애 원천 차단)
+            sudo ufw disable || true
+            # 2. MTU 패치 (테일스케일 환경 필수)
+            kubectl patch cm -n kube-system calico-config --type merge -p '{"data": {"veth_mtu": "1220"}}' || true
 
-            echo "📂 Applying Prometheus Application"
+            echo "🚀 Phase 2: Monitoring Stack (Idempotent Apply)"
+            # 1. 네임스페이스 생성
+            kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+
+            # 2. 그라파나 비밀번호 주입 (이미 있으면 유지)
+            kubectl create secret generic grafana-admin-credentials \
+            -n monitoring --from-literal=admin-password='${{ secrets.GRAFANA_PASSWORD }}' \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+            # 3. [핵심] 프로메테우스 스택 '주문서' 등록
+            # 이 리소스 자체가 argocd 네임스페이스에 있어야 아르고CD가 일을 시작합니다.
             cat <<EOF | kubectl apply -f -
             apiVersion: argoproj.io/v1alpha1
             kind: Application
             metadata:
-              name: prometheus-stack
-              namespace: argocd # 관리 주체는 argocd
+            name: prometheus-stack
+            namespace: argocd
             spec:
-              project: default
-              source:
+            project: default
+            source:
                 chart: kube-prometheus-stack
                 repoURL: https://prometheus-community.github.io/helm-charts
-                targetRevision: 81.x.x
+                targetRevision: 81.x.x # 2026년 2월 최신 버전
                 helm:
-                  values: |
+                values: |
                     grafana:
-                      admin:
+                    admin:
                         existingSecret: "grafana-admin-credentials"
                         passwordKey: "admin-password"
-                      persistence:
+                    persistence:
                         enabled: true
                         size: 5Gi
                     prometheus:
-                      prometheusSpec:
+                    prometheusSpec:
                         retention: 15d
                         storageSpec:
-                          volumeClaimTemplate:
+                        volumeClaimTemplate:
                             spec:
-                              accessModes: ["ReadWriteOnce"]
-                              resources:
+                            accessModes: ["ReadWriteOnce"]
+                            resources:
                                 requests:
-                                  storage: 10Gi
-              destination:
+                                storage: 10Gi
+            destination:
                 server: https://kubernetes.default.svc
-                namespace: monitoring # 설치 목적지는 monitoring
-              syncPolicy:
-                automated: {prune: true, selfHeal: true}
-                syncOptions: [CreateNamespace=true]
+                namespace: monitoring # 실제 설치는 여기에!
+            syncPolicy:
+                automated:
+                prune: true
+                selfHeal: true
+                syncOptions:
+                - CreateNamespace=true
             EOF
-            echo "✅ Monitoring Application Registered!"
+
+            echo "✅ All blueprints applied. Checking sync status..."
