@@ -69,7 +69,8 @@ repo/
   │     ├── gateway/          # Kotlin + Spring
   │     ├── frontend/         # Typescript + React
   │     ├── backend/          # Python + Django
-  │     └── models/           # Python + FastAPI
+  │     ├── models/           # Python + FastAPI
+  │     └── monitoring.yaml   # Monitoring
   │
   └── README.md
 ```

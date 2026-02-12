@@ -17,9 +17,13 @@ jobs:
       - name: 📖 Read root-app.yaml
         id: read_root_app
         run: |
-          # 파일 내용을 읽어 환경 변수에 안전하게 저장 (멀티라인 대응)
+          # 1. 파일이 존재하는지 다시 한번 확인 (생존 신고)
+          ls -l argocd/root-app.yaml
+
+          # 2. 멀티라인 변수 저장 (강제 줄바꿈 추가)
           echo "ROOT_APP_CONTENT<<EOF" >> $GITHUB_ENV
-          cat argocd/root-app.yaml >> $GITHUB_ENV  # 👈 '>> $GITHUB_ENV'가 반드시 붙어야 합니다.
+          cat argocd/root-app.yaml >> $GITHUB_ENV
+          echo "" >> $GITHUB_ENV  # 👈 [핵심] 파일 끝에 강제로 줄바꿈 삽입
           echo "EOF" >> $GITHUB_ENV
 
       - name: 🏗️ Install ArgoCD & Apply Root App
