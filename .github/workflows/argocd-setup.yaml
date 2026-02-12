@@ -2,11 +2,10 @@ name: "Step 2: ArgoCD Base Setup"
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ master ]
-    paths:
-      - ".github/workflows/argocd-setup.yaml"
-      - "manifests/monitoring.yaml"
+#   push:
+#     branches: [ master ]
+#     paths:
+#       - ".github/workflows/argocd-setup.yaml"
 
 jobs:
   setup-argocd:

@@ -5,6 +5,7 @@ on:
     branches: [ master ]
     paths:
       - ".github/workflows/monitoring-setup.yaml"
+      - "manifests/monitoring.yaml"
 
 jobs:
   deploy-monitoring:
