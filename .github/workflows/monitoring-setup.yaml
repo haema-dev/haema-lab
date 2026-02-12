@@ -15,21 +15,21 @@ jobs:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
 
       - name: 📖 Read monitoring.yaml
-        id: read_monitoring
+        id: read_file
         run: |
-          # 1. 파일 위치 검색 및 확인 (argocd/ 또는 manifests/ 또는 root)
-          FILE_PATH=$(find . -name "monitoring.yaml" | head -n 1)
+          # 1. 파일 위치를 유연하게 찾습니다 (root, manifests, argocd 폴더 검색)
+          TARGET_FILE=$(find . -name "monitoring.yaml" | head -n 1)
           
-          if [ -z "$FILE_PATH" ]; then
-            echo "❌ Error: monitoring.yaml 파일을 찾을 수 없습니다!"
+          if [ -z "$TARGET_FILE" ]; then
+            echo "❌ Error: monitoring.yaml 파일을 리포지토리 어디에서도 찾을 수 없습니다!"
             exit 1
           fi
-          echo "✅ Found file at: $FILE_PATH"
+          echo "✅ Found file at: $TARGET_FILE"
 
-          # 2. 멀티라인 변수 저장 (줄바꿈 버그 방지)
+          # 2. 멀티라인 변수를 가장 안전한 방법으로 저장합니다.
           echo "MONITORING_CONTENT<<EOF" >> $GITHUB_ENV
-          cat "$FILE_PATH" >> $GITHUB_ENV
-          echo "" >> $GITHUB_ENV # 강제 줄바꿈
+          cat "$TARGET_FILE" >> $GITHUB_ENV
+          echo "" >> $GITHUB_ENV # 마지막 줄바꿈 보장
           echo "EOF" >> $GITHUB_ENV
 
       - name: 📊 Deploy Prometheus via ArgoCD
@@ -38,27 +38,28 @@ jobs:
           host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_USERNAME_PRIVATE_KEY }}
-          envs: MONITORING_CONTENT
+          envs: MONITORING_CONTENT # [중요] 변수 이름을 정확히 전달
           script: |
             set -e
             export KUBECONFIG=$HOME/.kube/config
 
-            echo "🛡️ Phase 1: Infrastructure Fix"
-            sudo ufw disable || true
-            # StorageClass는 프로메테우스의 집(디스크)이므로 반드시 필요합니다.
-            kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
-            kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}' || true
-
             echo "🚀 Phase 2: Monitoring Stack Deployment"
-            kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
             
-            # 변수가 비어있는지 마지막 확인
+            # 3. [냉철한 검증] 전달받은 변수가 비어있는지 서버 측에서 한 번 더 확인합니다.
             if [ -z "$MONITORING_CONTENT" ]; then
-              echo "❌ Error: MONITORING_CONTENT is empty!"
+              echo "❌ Error: 원격 서버로 전달된 MONITORING_CONTENT가 비어 있습니다!"
               exit 1
             fi
             
-            # [핵심] 전달받은 파일 내용으로 배포
+            echo "📝 Received Content Length: ${#MONITORING_CONTENT} characters"
+
+            # 4. 네임스페이스 및 시크릿 보장 (기존 데이터 안전)
+            kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+            kubectl create secret generic grafana-admin-credentials \
+              -n monitoring --from-literal=admin-password='${{ secrets.GRAFANA_PASSWORD }}' \
+              --dry-run=client -o yaml | kubectl apply -f -
+
+            # 5. [핵심] 변수 내용을 주입하여 배포
             echo "$MONITORING_CONTENT" | kubectl apply -f -
 
             echo "✅ Deployment Successful!"
