@@ -50,13 +50,14 @@ jobs:
       # 4. K8s 매니페스트 태그 자동 수정 (GitOps 핵심)
       - name: 📝 Update K8s Manifest
         run: |
-          sed -i "s|image: ghcr.io/.*|image: ghcr.io/${{ github.repository_owner }}/cloud-gateway:${{ github.sha }}|g" manifests/gateway/deployment.yaml
+          sed -i "s|image: ghcr.io/.*|image: ghcr.io/${{ github.repository_owner }}/cloud-gateway:${{ github.sha }}|g" manifests/apps/gateway/deployment.yaml
+          git add manifests/apps/gateway/deployment.yaml
 
       # 5. 변경된 태그를 Git에 커밋 (이걸 보고 ArgoCD가 움직입니다)
       - name: 🚀 Commit and Push
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add manifests/gateway/deployment.yaml
+          git add manifests/apps/gateway/deployment.yaml
           git commit -m "chore: update gateway image tag to ${{ github.sha }}"
           git push

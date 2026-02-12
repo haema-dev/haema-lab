@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cloud-gateway
+  namespace: argocd # 보통 argocd 네임스페이스에 생성
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/haema-dev/haema-lab.git
+    targetRevision: master
+    path: manifests/apps # 실제 k8s 파일이 있는 경로
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default # 게이트웨이가 배포될 네임스페이스
+  syncPolicy:
+    automated: # 2026년 GitOps의 핵심: 자동 동기화
+      prune: true # 레포에서 삭제된 리소스를 K8s에서도 삭제
+      selfHeal: true # K8s에서 수동으로 바꾼 걸 다시 원복
