@@ -348,47 +348,8 @@ jobs:
             echo ""
             kubectl get pods -n kube-system --no-headers 2>/dev/null | head -5 || true
 
-            echo ""
-            echo "════════════════════════════════════"
             echo "🎉 Setup Phase Complete!"
-            echo "════════════════════════════════════"
 
-            # 9️⃣ Fix CoreDNS Service IP (자동 수정)
-            # echo ""
-            # echo "🔧 Fixing CoreDNS Service IP..."
-
-            # export KUBECONFIG="$KUBECONFIG_PATH"
-
-            # # 1. coredns → kube-dns로 변경
-            # kubectl delete svc coredns -n kube-system 2>/dev/null || true
-
-            # # 2. 올바른 설정으로 재생성
-            # kubectl apply -f - << 'EOF'
-            # apiVersion: v1
-            # kind: Service
-            # metadata:
-            #   name: kube-dns
-            #   namespace: kube-system
-            #   labels:
-            #     k8s-app: kube-dns
-            #     kubernetes.io/cluster-service: "true"
-            # spec:
-            #   selector:
-            #     k8s-app: kube-dns
-            #   clusterIP: 10.96.0.10
-            #   ports:
-            #   - name: dns
-            #     port: 53
-            #     protocol: UDP
-            #   - name: dns-tcp
-            #     port: 53
-            #     protocol: TCP
-            # EOF
-
-            # # 3. Pod 재시작
-            # kubectl delete pod -n kube-system -l k8s-app=kube-dns
-
-            # echo "✅ CoreDNS Service IP fixed to 10.96.0.10"
 
       # ════════════════════════════════════════
       # Phase 3: Verification (FIRST_USERNAME)
