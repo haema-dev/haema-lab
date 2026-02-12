@@ -14,12 +14,22 @@ jobs:
         with:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
 
-      - name: 📖 Read monitoring.yaml File
-        id: read_file
+      - name: 📖 Read monitoring.yaml
+        id: read_monitoring
         run: |
-          # 파일 내용을 읽어 환경 변수에 멀티라인으로 저장합니다.
+          # 1. 파일 위치 검색 및 확인 (argocd/ 또는 manifests/ 또는 root)
+          FILE_PATH=$(find . -name "monitoring.yaml" | head -n 1)
+          
+          if [ -z "$FILE_PATH" ]; then
+            echo "❌ Error: monitoring.yaml 파일을 찾을 수 없습니다!"
+            exit 1
+          fi
+          echo "✅ Found file at: $FILE_PATH"
+
+          # 2. 멀티라인 변수 저장 (줄바꿈 버그 방지)
           echo "MONITORING_CONTENT<<EOF" >> $GITHUB_ENV
-          cat manifests/monitoring.yaml
+          cat "$FILE_PATH" >> $GITHUB_ENV
+          echo "" >> $GITHUB_ENV # 강제 줄바꿈
           echo "EOF" >> $GITHUB_ENV
 
       - name: 📊 Deploy Prometheus via ArgoCD
@@ -28,27 +38,28 @@ jobs:
           host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_USERNAME_PRIVATE_KEY }}
-          envs: MONITORING_CONTENT # 읽어온 파일 내용을 SSH 세션으로 전달
+          envs: MONITORING_CONTENT
           script: |
             set -e
             export KUBECONFIG=$HOME/.kube/config
 
-            echo "🛡️ Phase 1: Infrastructure & Storage Fix"
+            echo "🛡️ Phase 1: Infrastructure Fix"
             sudo ufw disable || true
+            # StorageClass는 프로메테우스의 집(디스크)이므로 반드시 필요합니다.
             kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
-            kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+            kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}' || true
 
             echo "🚀 Phase 2: Monitoring Stack Deployment"
-            # 1. 시크릿 보장 (기존 데이터 보존)
             kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
-            kubectl create secret generic grafana-admin-credentials \
-              -n monitoring --from-literal=admin-password='${{ secrets.GRAFANA_PASSWORD }}' \
-              --dry-run=client -o yaml | kubectl apply -f -
-
-            # 2. [파일 읽기 방식] 전달받은 환경 변수를 직접 주입
-            # 이 명령어가 사용자님이 원하시던 "파일 불러오기"의 실체입니다.
+            
+            # 변수가 비어있는지 마지막 확인
+            if [ -z "$MONITORING_CONTENT" ]; then
+              echo "❌ Error: MONITORING_CONTENT is empty!"
+              exit 1
+            fi
+            
+            # [핵심] 전달받은 파일 내용으로 배포
             echo "$MONITORING_CONTENT" | kubectl apply -f -
 
-            echo "⏳ Checking Status..."
+            echo "✅ Deployment Successful!"
             kubectl get app -n argocd prometheus-stack
-            kubectl get pods -n monitoring

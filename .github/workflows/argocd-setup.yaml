@@ -13,18 +13,7 @@ jobs:
         uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
-
-      - name: 📖 Read root-app.yaml
-        id: read_root_app
-        run: |
-          # 1. 파일이 존재하는지 다시 한번 확인 (생존 신고)
-          ls -l argocd/root-app.yaml
-
-          # 2. 멀티라인 변수 저장 (강제 줄바꿈 추가)
-          echo "ROOT_APP_CONTENT<<EOF" >> $GITHUB_ENV
-          cat argocd/root-app.yaml >> $GITHUB_ENV
-          echo "" >> $GITHUB_ENV  # 👈 [핵심] 파일 끝에 강제로 줄바꿈 삽입
-          echo "EOF" >> $GITHUB_ENV
+          
 
       - name: 🏗️ Install ArgoCD & Apply Root App
         uses: appleboy/ssh-action@master
