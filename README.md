@@ -48,8 +48,9 @@
 ```bash
 repo/
   ├── .github/workflows/
-  │             ├── bootstrap.yml     # Kubespray → k8s + Ansible
-  │             ├── argocd-setup.yml  # ArgoCD Install
+  │             ├── bootstrap.yml           # Kubespray → k8s + Ansible
+  │             ├── argocd-setup.yml        # ArgoCD
+  │             ├── monitoring-setup.yaml   # Monitoring
   │             ├── deploy-gateway.yml
   │             ├── deploy-backend.yml
   │             ├── deploy-front.yml
@@ -65,11 +66,10 @@ repo/
   │     └── root-app.yaml
   │
   ├── manifests/
-  │     ├── gateway/    # Kotlin + Spring
-  │     ├── frontend/   # Typescript + React
-  │     ├── backend/    # Python + Django
-  │     ├── models/     # Python + FastAPI
-  │     └── infra/      # Prometheus
+  │     ├── gateway/          # Kotlin + Spring
+  │     ├── frontend/         # Typescript + React
+  │     ├── backend/          # Python + Django
+  │     └── models/           # Python + FastAPI
   │
   └── README.md
 ```
