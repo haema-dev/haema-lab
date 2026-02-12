@@ -273,7 +273,7 @@ jobs:
             kubelet_extra_args: "--cluster-dns=10.96.0.10 --cluster-domain=cluster.local"
 
             # 🆕 CoreDNS 서비스 IP 명시
-            dns_cluster_ip: "10.96.0.10"
+            dns_cluster_ip: "10.96.0.3"
 
             containerd_cgroup_driver: systemd
             kubelet_cgroup_driver: systemd
