@@ -15,7 +15,7 @@
 
 ## 🏛️ System Architecture
 
-![System Architecture Diagram](./system_architecture.png)
+![System Architecture Diagram](./system_architecture4.png)
 
 ## ⚙️ Infrastructure Constraints & Design Decisions
 
@@ -38,10 +38,10 @@
 - **Orchestration**: Kubernetes via Kubespray/Ansible
 - **Network & Access**: Tailscale (Mesh VPN)
 - **CI/CD & GitOps**: GitHub Actions, ArgoCD
-- **Monitoring**: Prometheus & Grafana
+- **Monitoring**: Proxmox & ArgoCD & Discord Webhook
 - **MLOps Pipeline**: Apache Airflow (Batch) + Ollama + FastAPI
 - **Model**: BGE-M3, EXAONE-3.5:7.8B, Qwen2.5:14B, Gemini 2.5 Pro (API)
-- **Langauge & Framework**: Python, Django, Kotlin, Spring Boot
+- **Langauge & Framework**: Python, Django, FastAPI, Kotlin, Spring Boot
 - **Database**: Redis (Caching), PostgreSQL + PGVector
 
 ## 📁 Folder Architecture
