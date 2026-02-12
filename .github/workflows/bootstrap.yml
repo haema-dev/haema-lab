@@ -273,7 +273,7 @@ jobs:
             kubelet_extra_args: "--cluster-dns=10.96.0.10 --cluster-domain=cluster.local"
 
             # 🆕 CoreDNS 서비스 IP 명시
-            dns_cluster_ip: "10.96.0.3"
+            dns_cluster_ip: "10.96.0.10"
 
             containerd_cgroup_driver: systemd
             kubelet_cgroup_driver: systemd
@@ -354,41 +354,41 @@ jobs:
             echo "════════════════════════════════════"
 
             # 9️⃣ Fix CoreDNS Service IP (자동 수정)
-            echo ""
-            echo "🔧 Fixing CoreDNS Service IP..."
+            # echo ""
+            # echo "🔧 Fixing CoreDNS Service IP..."
 
-            export KUBECONFIG="$KUBECONFIG_PATH"
+            # export KUBECONFIG="$KUBECONFIG_PATH"
 
-            # 1. coredns → kube-dns로 변경
-            kubectl delete svc coredns -n kube-system 2>/dev/null || true
+            # # 1. coredns → kube-dns로 변경
+            # kubectl delete svc coredns -n kube-system 2>/dev/null || true
 
-            # 2. 올바른 설정으로 재생성
-            kubectl apply -f - << 'EOF'
-            apiVersion: v1
-            kind: Service
-            metadata:
-              name: kube-dns
-              namespace: kube-system
-              labels:
-                k8s-app: kube-dns
-                kubernetes.io/cluster-service: "true"
-            spec:
-              selector:
-                k8s-app: kube-dns
-              clusterIP: 10.96.0.10
-              ports:
-              - name: dns
-                port: 53
-                protocol: UDP
-              - name: dns-tcp
-                port: 53
-                protocol: TCP
-            EOF
+            # # 2. 올바른 설정으로 재생성
+            # kubectl apply -f - << 'EOF'
+            # apiVersion: v1
+            # kind: Service
+            # metadata:
+            #   name: kube-dns
+            #   namespace: kube-system
+            #   labels:
+            #     k8s-app: kube-dns
+            #     kubernetes.io/cluster-service: "true"
+            # spec:
+            #   selector:
+            #     k8s-app: kube-dns
+            #   clusterIP: 10.96.0.10
+            #   ports:
+            #   - name: dns
+            #     port: 53
+            #     protocol: UDP
+            #   - name: dns-tcp
+            #     port: 53
+            #     protocol: TCP
+            # EOF
 
-            # 3. Pod 재시작
-            kubectl delete pod -n kube-system -l k8s-app=kube-dns
+            # # 3. Pod 재시작
+            # kubectl delete pod -n kube-system -l k8s-app=kube-dns
 
-            echo "✅ CoreDNS Service IP fixed to 10.96.0.10"
+            # echo "✅ CoreDNS Service IP fixed to 10.96.0.10"
 
       # ════════════════════════════════════════
       # Phase 3: Verification (FIRST_USERNAME)
