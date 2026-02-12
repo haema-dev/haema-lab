@@ -50,7 +50,6 @@ repo/
   ├── .github/workflows/
   │             ├── bootstrap.yml           # Kubespray → k8s + Ansible
   │             ├── argocd-setup.yml        # ArgoCD
-  │             ├── monitoring-setup.yaml   # Monitoring
   │             ├── deploy-gateway.yml
   │             ├── deploy-backend.yml
   │             ├── deploy-front.yml
@@ -70,7 +69,6 @@ repo/
   │     ├── frontend/         # Typescript + React
   │     ├── backend/          # Python + Django
   │     ├── models/           # Python + FastAPI
-  │     └── monitoring.yaml   # Monitoring
   │
   └── README.md
 ```
