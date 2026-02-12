@@ -19,7 +19,7 @@ jobs:
         run: |
           # 파일 내용을 읽어 환경 변수에 안전하게 저장 (멀티라인 대응)
           echo "ROOT_APP_CONTENT<<EOF" >> $GITHUB_ENV
-          cat root-app.yaml
+          cat argocd/root-app.yaml
           echo "EOF" >> $GITHUB_ENV
 
       - name: 🏗️ Install ArgoCD & Apply Root App
