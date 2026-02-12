@@ -1,30 +1,34 @@
 name: "Step 2: ArgoCD Base Setup"
-
 on:
   workflow_dispatch:
-#   push:
-#     branches: [ master ]
-#     paths:
-#       - ".github/workflows/argocd-setup.yaml"
 
 jobs:
   setup-argocd:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: 📂 Checkout Repository
+        uses: actions/checkout@v4
 
       - name: 🌎 Connect to Tailscale
         uses: tailscale/github-action@v2
         with:
-          version: 1.94.1
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
 
-      - name: 🏗️ Install ArgoCD Core
+      - name: 📖 Read root-app.yaml
+        id: read_root_app
+        run: |
+          # 파일 내용을 읽어 환경 변수에 안전하게 저장 (멀티라인 대응)
+          echo "ROOT_APP_CONTENT<<EOF" >> $GITHUB_ENV
+          cat root-app.yaml
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: 🏗️ Install ArgoCD & Apply Root App
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_USERNAME_PRIVATE_KEY }}
+          envs: ROOT_APP_CONTENT # 위에서 읽은 파일 내용을 전달
           script: |
             set -e
             export KUBECONFIG=$HOME/.kube/config
@@ -33,10 +37,15 @@ jobs:
             sudo ufw disable || true
             kubectl patch cm -n kube-system calico-config --type merge -p '{"data": {"veth_mtu": "1220"}}' || true
 
-            echo "🚀 Installing ArgoCD"
+            echo "🚀 Installing ArgoCD Core"
             kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
             kubectl apply --server-side --force-conflicts -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.10.4/manifests/install.yaml
             
-            echo "⏳ Waiting for Readiness"
+            echo "⏳ Waiting for ArgoCD Server"
             kubectl rollout status deployment/argocd-server -n argocd --timeout=300s
-            echo "✅ ArgoCD Ready!"
+
+            echo "📂 Applying Root Application from file"
+            # Runner에서 읽어온 파일 내용을 그대로 적용
+            echo "$ROOT_APP_CONTENT" | kubectl apply -f -
+            
+            echo "✅ ArgoCD & Root App Ready!"
