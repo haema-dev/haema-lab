@@ -9,6 +9,8 @@ spec:
     repoURL: https://github.com/haema-dev/haema-lab.git
     targetRevision: master
     path: manifests/apps # 실제 k8s 파일이 있는 경로
+    directory:
+      recurse: true
   destination:
     server: https://kubernetes.default.svc
     namespace: default # 게이트웨이가 배포될 네임스페이스
