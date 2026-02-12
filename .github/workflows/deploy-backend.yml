@@ -1,11 +1,11 @@
-name: "Step 3: Deploy Spring Cloud Gateway to GHCR"
+name: "Step 3: Deploy Django Backend to GHCR"
 
 on:
   workflow_dispatch:
   push:
     branches: [ master ]
     paths:
-      - 'apps/gateway/**' # 게이트웨이 코드가 바뀔 때만 작동
+      - 'apps/backend/**' # 게이트웨이 코드가 바뀔 때만 작동
 
 jobs:
   build-and-deploy:
@@ -18,17 +18,17 @@ jobs:
       - uses: actions/checkout@v4
 
       # 1. Java/Kotlin 빌드 (Gradle 사용)
-      - name: ☕ Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: 'gradle' # 이 줄을 추가하면 빌드 속도가 비약적으로 빨라집니다.
+      # - name: ☕ Set up JDK 21
+      #   uses: actions/setup-java@v4
+      #   with:
+      #     java-version: '21'
+      #     distribution: 'temurin'
+      #     cache: 'gradle' # 이 줄을 추가하면 빌드 속도가 비약적으로 빨라집니다.
 
-      - name: 🔨 Build with Gradle
-        run: |
-          chmod +x apps/gateway/gradlew
-          ./apps/gateway/gradlew -p apps/gateway clean build -x test
+      # - name: 🔨 Build with Gradle
+      #   run: |
+      #     chmod +x apps/gateway/gradlew
+      #     ./apps/gateway/gradlew -p apps/gateway clean build -x test
 
       # 2. GHCR 로그인 (별도 Secret 필요 없음, 자동 제공됨)
       - name: 🔐 Login to GitHub Container Registry
@@ -41,23 +41,23 @@ jobs:
       # 3. Docker 이미지 빌드 및 푸시
       - name: 🐳 Build and Push Docker Image
         run: |
-          IMAGE_NAME=$(echo "ghcr.io/${{ github.repository_owner }}/cloud-gateway" | tr '[:upper:]' '[:lower:]')
+          IMAGE_NAME=$(echo "ghcr.io/${{ github.repository_owner }}/backend" | tr '[:upper:]' '[:lower:]')
           TAG=${{ github.sha }}
-          docker build -t $IMAGE_NAME:$TAG -t $IMAGE_NAME:latest ./apps/gateway
+          docker build -t $IMAGE_NAME:$TAG -t $IMAGE_NAME:latest ./apps/backend
           docker push $IMAGE_NAME:$TAG
           docker push $IMAGE_NAME:latest
 
       # 4. K8s 매니페스트 태그 자동 수정 (GitOps 핵심)
       - name: 📝 Update K8s Manifest
         run: |
-          sed -i "s|image: ghcr.io/.*|image: ghcr.io/${{ github.repository_owner }}/cloud-gateway:${{ github.sha }}|g" manifests/apps/gateway/deployment.yaml
-          git add manifests/apps/gateway/deployment.yaml
+          sed -i "s|image: ghcr.io/.*|image: ghcr.io/${{ github.repository_owner }}/backend:${{ github.sha }}|g" manifests/apps/backend/deployment.yaml
+          git add manifests/apps/backend/deployment.yaml
 
       # 5. 변경된 태그를 Git에 커밋 (이걸 보고 ArgoCD가 움직입니다)
       - name: 🚀 Commit and Push
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add manifests/apps/gateway/deployment.yaml
-          git commit -m "chore: update gateway image tag to ${{ github.sha }}"
+          git add manifests/apps/backend/deployment.yaml
+          git commit -m "chore: update backend image tag to ${{ github.sha }}"
           git push

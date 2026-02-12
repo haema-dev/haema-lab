@@ -1,2 +1,62 @@
 README2.md
-sllm/__pycache__/
+sllm/
+embedding/
+crawling/
+data/
+myenv/
+requirements.txt
+
+# Gateway
+apps/gateway/HELP.md
+apps/gateway/.gradle
+apps/gateway/build/
+apps/gateway/!gradle/wrapper/gradle-wrapper.jar
+apps/gateway/!**/src/main/**/build/
+apps/gateway/!**/src/test/**/build/
+### IntelliJ IDEA ###
+apps/gateway/.idea
+apps/gateway/*.iws
+apps/gateway/*.iml
+apps/gateway/*.ipr
+apps/gateway/out/
+apps/gateway/bin
+apps/gateway/!**/src/main/**/out/
+apps/gateway/!**/src/test/**/out/
+### Kotlin ###
+apps/gateway/.kotlin
+
+
+
+# Backend
+apps/backend/.venv/
+apps/backend/config/__pycache__/
+apps/backend/core/__pycache__/
+apps/backend/.env
+
+
+# Frontend
+# Logs
+apps/frontend/logs
+apps/frontend/*.log
+apps/frontend/npm-debug.log*
+apps/frontend/yarn-debug.log*
+apps/frontend/yarn-error.log*
+apps/frontend/pnpm-debug.log*
+apps/frontend/lerna-debug.log*
+
+apps/frontend/node_modules
+apps/frontend/dist
+apps/frontend/dist-ssr
+apps/frontend/*.local
+
+# Editor directories and files
+apps/frontend/.vscode/*
+apps/frontend/!.vscode/extensions.json
+apps/frontend/.idea
+apps/frontend/.DS_Store
+apps/frontend/*.suo
+apps/frontend/*.ntvs*
+apps/frontend/*.njsproj
+apps/frontend/*.sln
+apps/frontend/*.sw?
+apps/frontend/package-lock.json
