@@ -25,63 +25,33 @@ jobs:
             set -e
             export KUBECONFIG=$HOME/.kube/config
 
-            echo "🛡️ Phase 1: Infrastructure Fix"
-            # 1. 방화벽 비활성화 (통신 장애 원천 차단)
+            echo "🛡️ Phase 1: Infrastructure Compliance Check"
+            echo "════════════════════════════════════════"
+            # 1. 방화벽: 통신 장애의 근원 ufw 비활성화
             sudo ufw disable || true
-            # 2. MTU 패치 (테일스케일 환경 필수)
-            kubectl patch cm -n kube-system calico-config --type merge -p '{"data": {"veth_mtu": "1220"}}' || true
+            
+            # 2. MTU: Tailscale 환경에 맞게 1220 강제 패치
+            kubectl patch cm -n kube-system calico-config --type merge \
+              -p '{"data": {"veth_mtu": "1220"}}' || true
 
-            echo "🚀 Phase 2: Monitoring Stack (Idempotent Apply)"
-            # 1. 네임스페이스 생성
+            echo "🚀 Phase 2: Declarative Monitoring Setup"
+            echo "════════════════════════════════════════"
+            # 1. 네임스페이스 보장
             kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
 
-            # 2. 그라파나 비밀번호 주입 (이미 있으면 유지)
+            # 2. 그라파나 비밀번호 시크릿 (설정 변경 시 자동 업데이트)
             kubectl create secret generic grafana-admin-credentials \
-            -n monitoring --from-literal=admin-password='${{ secrets.GRAFANA_PASSWORD }}' \
-            --dry-run=client -o yaml | kubectl apply -f -
+              -n monitoring --from-literal=admin-password='${{ secrets.GRAFANA_PASSWORD }}' \
+              --dry-run=client -o yaml | kubectl apply -f -
 
-            # 3. [핵심] 프로메테우스 스택 '주문서' 등록
-            # 이 리소스 자체가 argocd 네임스페이스에 있어야 아르고CD가 일을 시작합니다.
-            cat <<EOF | kubectl apply -f -
-            apiVersion: argoproj.io/v1alpha1
-            kind: Application
-            metadata:
-            name: prometheus-stack
-            namespace: argocd
-            spec:
-            project: default
-            source:
-                chart: kube-prometheus-stack
-                repoURL: https://prometheus-community.github.io/helm-charts
-                targetRevision: 81.x.x # 2026년 2월 최신 버전
-                helm:
-                values: |
-                    grafana:
-                    admin:
-                        existingSecret: "grafana-admin-credentials"
-                        passwordKey: "admin-password"
-                    persistence:
-                        enabled: true
-                        size: 5Gi
-                    prometheus:
-                    prometheusSpec:
-                        retention: 15d
-                        storageSpec:
-                        volumeClaimTemplate:
-                            spec:
-                            accessModes: ["ReadWriteOnce"]
-                            resources:
-                                requests:
-                                storage: 10Gi
-            destination:
-                server: https://kubernetes.default.svc
-                namespace: monitoring # 실제 설치는 여기에!
-            syncPolicy:
-                automated:
-                prune: true
-                selfHeal: true
-                syncOptions:
-                - CreateNamespace=true
-            EOF
+            # 3. [핵심] GitHub Raw URL을 통한 주문서(Application) 호출
+            # 마스터 브랜치의 최신 monitoring.yaml을 직접 apply 합니다.
+            RAW_URL="https://raw.githubusercontent.com/${{ github.repository }}/master/argocd/monitoring.yaml"
+            
+            echo "📥 Fetching blueprint from: $RAW_URL"
+            kubectl apply -f $RAW_URL
 
-            echo "✅ All blueprints applied. Checking sync status..."
+            echo "⏳ Monitoring Application Sync Status:"
+            kubectl get app -n argocd prometheus-stack || echo "⚠️ Waiting for ArgoCD to recognize the app..."
+
+            echo "✅ All blueprints applied. Monitoring setup in progress!"
