@@ -5,15 +5,27 @@ on:
     branches: [ master ]
     paths:
       - ".github/workflows/monitoring-setup.yaml"
+      - "manifests/monitoring.yaml"
 
 jobs:
   deploy-monitoring:
     runs-on: ubuntu-latest
     steps:
+      - name: 📂 Checkout Repository
+        uses: actions/checkout@v4 # [핵심] 리포지토리 파일을 가져옵니다.
+
       - name: 🌎 Connect to Tailscale
         uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
+
+      - name: 📖 Read monitoring.yaml File
+        id: read_file
+        run: |
+          # 파일 내용을 읽어 환경 변수에 멀티라인으로 저장합니다.
+          echo "MONITORING_CONTENT<<EOF" >> $GITHUB_ENV
+          cat manifests/monitoring.yaml
+          echo "EOF" >> $GITHUB_ENV
 
       - name: 📊 Deploy Prometheus via ArgoCD
         uses: appleboy/ssh-action@master
@@ -21,74 +33,27 @@ jobs:
           host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_USERNAME_PRIVATE_KEY }}
+          envs: MONITORING_CONTENT # 읽어온 파일 내용을 SSH 세션으로 전달
           script: |
             set -e
             export KUBECONFIG=$HOME/.kube/config
 
             echo "🛡️ Phase 1: Infrastructure & Storage Fix"
-            # 1. 방화벽 및 MTU 해결
             sudo ufw disable || true
-            kubectl patch cm -n kube-system calico-config --type merge -p '{"data": {"veth_mtu": "1220"}}' || true
-
-            # 2. [추가] StorageClass 설치 (이게 없으면 프로메테우스가 안 뜹니다)
             kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
             kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
 
             echo "🚀 Phase 2: Monitoring Stack Deployment"
-            # 1. 시크릿 및 네임스페이스 보장
+            # 1. 시크릿 보장 (기존 데이터 보존)
             kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
             kubectl create secret generic grafana-admin-credentials \
               -n monitoring --from-literal=admin-password='${{ secrets.GRAFANA_PASSWORD }}' \
               --dry-run=client -o yaml | kubectl apply -f -
 
-            # 2. [최종 교정] Application 리소스 주입
-            # metadata.namespace는 반드시 'argocd'여야 아르고CD가 일을 시작합니다.
-            kubectl apply -f - <<'EOF'
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-name: prometheus-stack
-namespace: argocd
-spec:
-project: default
-source:
-    chart: kube-prometheus-stack
-    repoURL: https://prometheus-community.github.io/helm-charts
-    targetRevision: 68.2.1
-    helm:
-    values: |
-        grafana:
-        admin:
-            existingSecret: "grafana-admin-credentials"
-            passwordKey: "admin-password"
-        persistence:
-            enabled: true
-            size: 5Gi
-        prometheus:
-        prometheusSpec:
-            retention: 15d
-            storageSpec:
-            volumeClaimTemplate:
-                spec:
-                accessModes: ["ReadWriteOnce"]
-                resources:
-                    requests:
-                    storage: 10Gi
-destination:
-    server: https://kubernetes.default.svc
-    namespace: monitoring
-syncPolicy:
-    automated:
-    prune: true
-    selfHeal: true
-    syncOptions:
-    - CreateNamespace=true
-EOF
+            # 2. [파일 읽기 방식] 전달받은 환경 변수를 직접 주입
+            # 이 명령어가 사용자님이 원하시던 "파일 불러오기"의 실체입니다.
+            echo "$MONITORING_CONTENT" | kubectl apply -f -
 
-            echo "⏳ Checking Sync Status..."
-            # 주문서 확인은 argocd 네임스페이스에서 합니다.
+            echo "⏳ Checking Status..."
             kubectl get app -n argocd prometheus-stack
-
-            echo "📊 Monitoring Pods Status..."
-            # 실제 일꾼(Pod) 확인은 monitoring 네임스페이스에서 합니다.
             kubectl get pods -n monitoring
