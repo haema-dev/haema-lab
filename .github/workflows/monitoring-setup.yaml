@@ -1,11 +1,6 @@
 name: "Step 3: Monitoring Stack Setup"
 on:
   workflow_dispatch:
-  push:
-    branches: [ master ]
-    paths:
-      - ".github/workflows/monitoring-setup.yaml"
-      - "manifests/monitoring.yaml"
 
 jobs:
   deploy-monitoring:

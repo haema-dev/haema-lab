@@ -1,4 +1,4 @@
-name: "Deploy Spring Cloud Gateway to GHCR"
+name: "Step3: Deploy Spring Cloud Gateway to GHCR"
 
 on:
   push:

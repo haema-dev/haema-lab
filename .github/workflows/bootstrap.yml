@@ -2,10 +2,6 @@ name: "Step 1: Kubespray K8s"
 
 on:
   workflow_dispatch:
-  # push:
-  #   branches: [ master ]
-  #   paths:
-  #     - ".github/workflows/bootstrap.yml"
 
 jobs:
   setup:
