@@ -5,7 +5,6 @@ on:
     branches: [ master ]
     paths:
       - ".github/workflows/monitoring-setup.yaml"
-      - "manifests/monitoring.yaml"
 
 jobs:
   deploy-monitoring:
@@ -35,15 +34,15 @@ jobs:
             kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
             kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
 
-            echo "🚀 Phase 2: Monitoring Stack (Idempotent Apply)"
-            # 1. 네임스페이스 및 시크릿 보장 (이미 있으면 유지되므로 데이터 안전)
+            echo "🚀 Phase 2: Monitoring Stack Deployment"
+            # 1. 시크릿 및 네임스페이스 보장
             kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
             kubectl create secret generic grafana-admin-credentials \
               -n monitoring --from-literal=admin-password='${{ secrets.GRAFANA_PASSWORD }}' \
               --dry-run=client -o yaml | kubectl apply -f -
 
-            # 2. [최종 병기] Heredoc 주입 (404 에러 완벽 차단)
-            # 따옴표('EOF')를 사용하여 SSH 환경에서의 변수 해석 오류를 방어합니다.
+            # 2. [최종 교정] Application 리소스 주입
+            # metadata.namespace는 반드시 'argocd'여야 아르고CD가 일을 시작합니다.
             kubectl apply -f - <<'EOF'
             apiVersion: argoproj.io/v1alpha1
             kind: Application
@@ -55,7 +54,7 @@ jobs:
             source:
                 chart: kube-prometheus-stack
                 repoURL: https://prometheus-community.github.io/helm-charts
-                targetRevision: 68.2.1 # 아까 수정한 안정화 버전으로 고정
+                targetRevision: 68.2.1
                 helm:
                 values: |
                     grafana:
@@ -86,7 +85,10 @@ jobs:
                 - CreateNamespace=true
             EOF
 
-            echo "⏳ Monitoring Application Sync Status:"
-            kubectl get app -n argocd prometheus-stack || echo "⚠️ Waiting for ArgoCD to recognize the app..."
+            echo "⏳ Checking Sync Status..."
+            # 주문서 확인은 argocd 네임스페이스에서 합니다.
+            kubectl get app -n argocd prometheus-stack
 
-            echo "✅ Monitoring setup applied directly!"
+            echo "📊 Monitoring Pods Status..."
+            # 실제 일꾼(Pod) 확인은 monitoring 네임스페이스에서 합니다.
+            kubectl get pods -n monitoring
