@@ -15,7 +15,7 @@ spec:
       recurse: true # [중요] 하위 폴더까지 다 뒤집니다
   destination:
     server: https://kubernetes.default.svc
-    namespace: default
+    namespace: argocd
   syncPolicy:
     automated:
       prune: true
