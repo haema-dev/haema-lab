@@ -6,6 +6,7 @@ on:
     branches: [ master ]
     paths:
       - ".github/workflows/argocd-setup.yaml"
+      - "manifests/monitoring.yaml"
 
 jobs:
   setup-argocd:
