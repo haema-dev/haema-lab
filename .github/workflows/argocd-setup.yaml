@@ -1,4 +1,4 @@
-name: "Step 2: ArgoCD Bootstrapping"
+name: "Step 2: ArgoCD Base Setup"
 
 on:
   workflow_dispatch:
@@ -19,7 +19,7 @@ jobs:
           version: 1.94.1
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
 
-      - name: 🏗️ Declarative ArgoCD & Infrastructure Setup
+      - name: 🏗️ Install ArgoCD Core
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.PROXMOX_VM_TAILSCALE_IP }}
@@ -29,45 +29,14 @@ jobs:
             set -e
             export KUBECONFIG=$HOME/.kube/config
 
-            echo "🛡️ Phase 1: Infrastructure Sanity Check"
-            echo "════════════════════════════════════"
-            # 1. 방화벽 점검: 통신 장애의 주범인 UFW를 비활성화하거나 필수 포트를 보장합니다.
+            echo "🛡️ Infrastructure Fix"
             sudo ufw disable || true
+            kubectl patch cm -n kube-system calico-config --type merge -p '{"data": {"veth_mtu": "1220"}}' || true
 
-            # 2. MTU 점검: Calico ConfigMap이 1220인지 상시 확인하고 패치합니다.
-            kubectl patch cm -n kube-system calico-config --type merge \
-              -p '{"data": {"veth_mtu": "1220"}}' || true
-
-            echo "🚀 Phase 2: Declarative Resource Sync"
-            echo "════════════════════════════════════"
-
-            # 1. StorageClass: 선언적으로 적용 (이미 있으면 유지)
-            kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
-            kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
-
-            # 2. Namespaces: 삭제 없이 생성 시도 (이미 있으면 무시)
+            echo "🚀 Installing ArgoCD"
             kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-            kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
-
-            # 3. ArgoCD Installation: Server-side apply로 변경 사항만 반영
             kubectl apply --server-side --force-conflicts -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.10.4/manifests/install.yaml
-
-            # 4. Secrets Sync: 데이터가 변경되었을 때만 업데이트
-            kubectl create secret generic argocd-redis -n argocd --from-literal=auth='' --dry-run=client -o yaml | kubectl apply -f -
-            kubectl create secret generic grafana-admin-credentials -n monitoring --from-literal=admin-password='${{ secrets.GRAFANA_PASSWORD }}' --dry-run=client -o yaml | kubectl apply -f -
-
-            # 5. CoreDNS & Calico Restart (설정 변경 시 런타임 반영 보장)
-            # MTU 변경이 파드에 즉시 반영되지 않는 특성을 고려하여 필요한 경우만 재시작 유도
-            if [[ $(kubectl get pods -n kube-system -l k8s-app=kube-dns -o jsonpath='{.items[0].status.phase}') != "Running" ]]; then
-              kubectl delete pod -n kube-system -l k8s-app=kube-dns || true
-            fi
-
-            echo "⏳ Waiting for ArgoCD Server Readiness..."
+            
+            echo "⏳ Waiting for Readiness"
             kubectl rollout status deployment/argocd-server -n argocd --timeout=300s
-
-            # 6. Root Application: 선언적 등록
-            echo "📂 Syncing Root Application..."
-            REPO_URL="https://raw.githubusercontent.com/${{ github.repository }}/master/argocd/root-app.yaml"
-            curl -s $REPO_URL | kubectl apply -f -
-
-            echo "✅ Declarative Setup Complete!"
+            echo "✅ ArgoCD Ready!"
