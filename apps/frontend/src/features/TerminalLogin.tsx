@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+// src/features/TerminalLogin.tsx
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { LogLine } from '../ui/LogLine';
-import { TactileButton } from '../ui/TactileButton';
-import '../styles/TerminalLogin.css'; // 새로 생성한 CSS 파일 임포트
+import '../styles/TerminalLogin.css';
 
 export default function TerminalLogin({ onLoginSuccess }: { onLoginSuccess: () => void }) {
-  const [accessCode, setAccessCode] = useState(''); 
+  const [accessCode, setAccessCode] = useState('2026');
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,40 +17,42 @@ export default function TerminalLogin({ onLoginSuccess }: { onLoginSuccess: () =
     "BYPASSING_RESTRICTIONS..."
   ];
 
-  const handleAccess = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!accessCode) return;
-    setIsVerifying(true);
-    setError(null);
-
-    setTimeout(() => {
-      if (accessCode === '2026') {
-        onLoginSuccess();
-      } else {
-        setError("ACCESS_DENIED: UNAUTHORIZED_SIGNAL");
-        setIsVerifying(false);
-      }
-    }, 2000);
-  };
-
   return (
     <div className="login-container">
+      {/* 카본 텍스처 배경 */}
       <div className="login-bg-texture" />
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="login-content-wrapper z-20"
+        className="login-content-wrapper"
       >
         <div className="login-header">
-          <h2 className="glitch-text" data-text="SYSTEM_AUTH">SYSTEM_AUTH</h2>
+          <h2>SYSTEM_AUTH</h2>
           <div className="header-divider" />
         </div>
 
-        <form onSubmit={handleAccess} className="login-form">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!accessCode) return;
+            setIsVerifying(true);
+            setError(null);
+
+            setTimeout(() => {
+              if (accessCode === '2026') {
+                onLoginSuccess();
+              } else {
+                setError("ACCESS_DENIED: UNAUTHORIZED_SIGNAL");
+                setIsVerifying(false);
+              }
+            }, 2000);
+          }}
+          className="login-form"
+        >
           <div className="input-group">
             <label>Protocol Key</label>
-            <input 
+            <input
               type="password"
               value={accessCode}
               onChange={(e) => setAccessCode(e.target.value)}
@@ -58,14 +60,18 @@ export default function TerminalLogin({ onLoginSuccess }: { onLoginSuccess: () =
               className="protocol-input"
             />
           </div>
-          
+
           {error && <div className="error-message">{error}</div>}
 
-          <TactileButton 
-            type="submit" 
-            label={isVerifying ? "Verifying..." : "Authorize Access"} 
+          <button
+            type="submit"
             disabled={isVerifying}
-          />
+            className={`login-submit-btn ${isVerifying ? 'verifying' : ''}`}
+          >
+            <span className="btn-label">
+              {isVerifying ? "Verifying..." : "Authorize Access"}
+            </span>
+          </button>
         </form>
 
         <div className="system-feed-container">

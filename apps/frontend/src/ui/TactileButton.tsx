@@ -17,7 +17,7 @@ export function TactileButton({ label, onClick, disabled, variant = 'cyan', type
   };
 
   return (
-    <motion.button 
+    <motion.button
       type={type} // 이 부분이 있어야 로그인이 넘어갑니다.
       whileTap={{ scale: 0.98, y: 2 }}
       onClick={onClick}

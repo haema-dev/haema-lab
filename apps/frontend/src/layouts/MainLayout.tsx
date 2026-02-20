@@ -1,25 +1,52 @@
 // src/layouts/MainLayout.tsx
-import { Outlet } from 'react-router-dom'; // 내부 화면 교체용
+import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { Sidebar } from '../features/Navigation/Sidebar';
-import { TerminalScreen } from '../ui/TerminalScreen';
+import TerminalFrame from '../ui/TerminalFrame';
 
-export function MainLayout() {
+interface MainLayoutProps {
+  children: ReactNode;
+}
+
+export function MainLayout({ children }: MainLayoutProps) {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
   return (
-    <div className="flex w-screen h-screen p-4 bg-term-bezel md:p-8">
-      {/* 하드웨어 외장 케이스 역할 */}
-      <div className="flex w-full h-full max-w-6xl mx-auto border-4 border-black rounded-xl shadow-2xl bg-[#111]">
-        
-        {/* 접이식 사이드바 컴포넌트 */}
-        <Sidebar />
+    <div className="app-container">
+      {/* 사이드바 */}
+      <Sidebar isOpen={isSidebarOpen} onToggle={() => setIsSidebarOpen(!isSidebarOpen)} />
 
-        {/* 메인 화면 영역 */}
-        <main className="flex-1 p-4">
-          <TerminalScreen>
-            {/* 이 위치에 /scanner, /map 등의 URL에 맞는 컴포넌트가 렌더링됨 */}
-            <Outlet /> 
-          </TerminalScreen>
-        </main>
-      </div>
+      {/* 모바일 전용: 사이드바 닫혀있을 때 열기 버튼 */}
+      {!isSidebarOpen && (
+        <button
+          className="mobile-sidebar-open-btn"
+          onClick={() => setIsSidebarOpen(true)}
+          title="사이드바 열기"
+        >
+          ▶
+        </button>
+      )}
+
+      {/* 모바일 전용: 사이드바 열려있을 때 배경 오버레이 (터치하면 닫힘) */}
+      {isSidebarOpen && (
+        <div
+          className="sidebar-overlay"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* 메인 단말기 영역 */}
+      <main className="main-terminal-wrapper">
+        <TerminalFrame>
+          {children}
+        </TerminalFrame>
+
+        {/* 하단 장식 베젤 */}
+        <div className="mobile-nav-bezel">
+          <div className="indicator-light red"></div>
+          <div className="indicator-light green blinking"></div>
+        </div>
+      </main>
     </div>
   );
 }
