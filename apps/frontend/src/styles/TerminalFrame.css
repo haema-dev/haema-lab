@@ -1,0 +1,95 @@
+/* TerminalFrame.css */
+
+/* --- 1. 외부 하드웨어 베젤 (단말기 테두리) --- */
+.terminal-bezel {
+    background-color: var(--color-hardware-bezel);
+    padding: 15px; 
+    border-radius: 8px;
+    /* 외부 입체감 및 화면 경계선 */
+    box-shadow: 
+        inset 2px 2px 5px rgba(255,255,255,0.05),
+        inset -2px -2px 5px rgba(0,0,0,0.8),
+        0 0 0 3px #000;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* --- 2. 화면 컨테이너 (깊이감 연출) --- */
+.terminal-screen-container {
+    flex: 1;
+    background-color: #000;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+    /* 화면이 안쪽으로 푹 파인 듯한 섀도우 */
+    box-shadow: inset 0 0 20px rgba(0,0,0,1);
+    border: 2px solid #111;
+}
+
+/* --- 3. 실제 스크린 배경 --- */
+.terminal-screen {
+    height: 100%;
+    width: 100%;
+    position: relative;
+    background-color: var(--color-screen-bg);
+    /* 브라운관 특유의 중앙 빛 반사 효과 */
+    background: radial-gradient(circle at center, #111618 0%, #080a0c 100%);
+}
+
+/* --- 4. 내부 콘텐츠 영역 --- */
+.terminal-content {
+    height: 100%;
+    padding: 20px;
+    overflow-y: auto;
+    color: var(--color-text);
+    text-shadow: 0 0 5px rgba(255, 179, 71, 0.4); /* 호박색 글로우 효과 */
+    position: relative;
+    z-index: 2;
+}
+
+/* --- 5. 스캔라인 (CRT 모니터 줄무늬 효과) --- */
+.scanlines::before {
+    content: " ";
+    display: block;
+    position: absolute;
+    top: 0; left: 0; bottom: 0; right: 0;
+    /* 가로줄 및 RGB 픽셀 분리 효과 렌더링 */
+    background: 
+      linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+      linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+    z-index: 10;
+    background-size: 100% 2px, 3px 100%;
+    pointer-events: none; /* 클릭 방해 금지 */
+}
+
+/* --- 6. 플리커 (오래된 기계의 미세한 깜빡임) --- */
+.flicker {
+    animation: crt-flicker 0.15s infinite;
+}
+
+@keyframes crt-flicker {
+    0% { opacity: 0.95; }
+    50% { opacity: 0.88; }
+    100% { opacity: 0.95; }
+}
+
+/* --- 7. 전원 켜짐 이펙트 (선택적 사용) --- */
+.power-on-effect {
+    animation: turn-on 1.2s ease-out forwards;
+}
+
+@keyframes turn-on {
+    0% {
+        transform: scale(1, 0.001) translate3d(0, 0, 0);
+        filter: brightness(10);
+    }
+    40% {
+        transform: scale(1, 0.001) translate3d(0, 0, 0);
+        filter: brightness(10);
+    }
+    100% {
+        transform: scale(1, 1) translate3d(0, 0, 0);
+        filter: brightness(1);
+    }
+}

@@ -1,0 +1,114 @@
+/* TerminalLogin.css */
+
+.login-container {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  position: relative;
+}
+
+.login-bg-texture {
+  position: absolute;
+  inset: 0;
+  opacity: 0.1;
+  background-image: url('https://www.transparenttextures.com/patterns/carbon-fibre.png');
+  pointer-events: none;
+}
+
+.login-content-wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.login-header {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.login-header h2 {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: var(--color-secondary-cyan);
+  letter-spacing: -0.05em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.header-divider {
+  height: 2px;
+  width: 3rem;
+  background-color: #0891b2;
+  margin: 0 auto;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.input-group label {
+  font-size: 10px;
+  color: #0e7490;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+
+.protocol-input {
+  width: 100%;
+  background-color: #09090b;
+  border: 1px solid rgba(8, 51, 68, 0.5);
+  padding: 1rem;
+  color: var(--color-secondary-cyan);
+  border-radius: 0.75rem;
+  text-align: center;
+  letter-spacing: 0.2em;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.protocol-input:focus {
+  border-color: var(--color-secondary-cyan);
+}
+
+.error-message {
+  color: var(--color-alert-red);
+  font-size: 0.75rem;
+  text-align: center;
+  animation: crt-flicker 1s infinite;
+}
+
+.system-feed-container {
+  padding-top: 2rem;
+  border-top: 1px solid #18181b;
+}
+
+.feed-title {
+  font-size: 10px;
+  color: #52525b;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+  letter-spacing: 0.1em;
+}
+
+.feed-logs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: 8rem;
+  overflow: hidden;
+}
