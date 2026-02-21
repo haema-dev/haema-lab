@@ -26,15 +26,17 @@ class RouteConfig {
 
             // 2. 프론트엔드 (나머지 모든 경로 /**)
             route("frontend_route") {
-                path("/**") // 최초 접속(/)을 포함한 모든 정적 자원
-                uri("http://cloud-frontend-svc.default.svc.cluster.local") // 80번 포트
+                path("/**")
+                uri("http://cloud-frontend-svc.default.svc.cluster.local")
             }
 
             // 3. 상태 점검용
             route("health_check") {
                 path("/ping")
                 filters { setStatus(200) }
-                uri("no-need-url") // 필터에서 응답하므로 의미 없음
+                // 'no-need-url' 대신 유효한 URI를 사용하라!
+                // 필터에서 200을 뱉으므로 실제 연결은 되지 않으나 형식은 지켜야 한다.
+                uri("forward:///health-check-dummy")
             }
         }
     }
