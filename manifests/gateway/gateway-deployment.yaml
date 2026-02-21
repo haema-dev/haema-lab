@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: gateway
-        image: ghcr.io/haema-dev/cloud-gateway:fff1e642d46a64aab068d096399529c269a29127
+        image: ghcr.io/haema-dev/cloud-gateway:latest
         ports:
         - containerPort: 8080
         resources:
@@ -25,16 +25,16 @@ spec:
           requests:
             cpu: "250m"
             memory: "256Mi"
-        livenessProbe:
-          httpGet:
-            path: /ping
-            port: 8080
-          initialDelaySeconds: 30
-          periodSeconds: 21600      # 6시간 (하루 4번)
-          timeoutSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /ping
-            port: 8080
-          initialDelaySeconds: 15
-          periodSeconds: 21600      # 6시간 (하루 4번)
+        # livenessProbe:
+        #   httpGet:
+        #     path: /ping
+        #     port: 8080
+        #   initialDelaySeconds: 30
+        #   periodSeconds: 21600      # 6시간 (하루 4번)
+        #   timeoutSeconds: 10
+        # readinessProbe:
+        #   httpGet:
+        #     path: /ping
+        #     port: 8080
+        #   initialDelaySeconds: 15
+        #   periodSeconds: 21600      # 6시간 (하루 4번)
