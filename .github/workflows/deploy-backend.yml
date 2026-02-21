@@ -1,18 +1,18 @@
-name: "Step 3: Deploy Django Backend to GHCR"
+name: "Step 3 [django]: Deploy Django Backend to GHCR"
 
 on:
   workflow_dispatch:
   push:
     branches: [ master ]
     paths:
-      - 'apps/backend/**' # 게이트웨이 코드가 바뀔 때만 작동
+      - 'apps/backend/**'
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      packages: write # GHCR에 이미지를 올리기 위한 권한
+      packages: write
 
     steps:
       - uses: actions/checkout@v4
