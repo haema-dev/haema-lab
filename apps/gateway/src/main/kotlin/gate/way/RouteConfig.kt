@@ -24,9 +24,10 @@ class RouteConfig {
 
             // 2. ArgoCD
             route("argocd_route") {
+                order(-1)
                 path("/admin/argocd", "/admin/argocd/", "/admin/argocd/**")
                 filters {
-                    // 2. /admin/argocd 2마디 자르기
+                    //  /admin/argocd 2마디 자르기
                     stripPrefix(2)
                 }
                 uri("http://argocd-server.argocd.svc.cluster.local:80")
