@@ -18,7 +18,6 @@ spec:
         image: ghcr.io/haema-dev/cloud-gateway:latest
         ports:
         - containerPort: 8080
-        # 2026년 기준 리소스 제한 (32GB RAM 노드 최적화)
         resources:
           limits:
             cpu: "500m"
@@ -26,13 +25,15 @@ spec:
           requests:
             cpu: "250m"
             memory: "256Mi"
-        # Actuator를 활용한 상태 체크
         livenessProbe:
           httpGet:
-            path: /actuator/health/liveness
+            path: /ping
             port: 8080
-          initialDelaySeconds: 45
+          initialDelaySeconds: 15
+          periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /actuator/health/readiness
+            path: /ping
             port: 8080
+          initialDelaySeconds: 10 
+          periodSeconds: 5
