@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: gateway
-        image: ghcr.io/haema-dev/cloud-gateway:ab78a4a02f0ed8acaf88251f7b479f071d9d24f1
+        image: ghcr.io/haema-dev/cloud-gateway:latest
         ports:
         - containerPort: 8080
         # 2026년 기준 리소스 제한 (32GB RAM 노드 최적화)
