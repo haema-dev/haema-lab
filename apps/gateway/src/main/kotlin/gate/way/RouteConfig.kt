@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Configuration
 class RouteConfig {
 
     @Bean
-    fun routeLocator(builder: RouteLocatorBuilder): RouteLocator {
+    fun customRouteLocator(builder: RouteLocatorBuilder): RouteLocator {
         return builder.routes {
             // 1. 백엔드 API (가장 구체적인 경로를 우선 배치)
 //            route("backend_service") {
