@@ -15,10 +15,9 @@ spec:
     spec:
       containers:
       - name: gateway
-        image: ghcr.io/haema-dev/cloud-gateway:4a4d8dce0846d3fc81dcf0e62ae333fbd3e1103f
+        image: ghcr.io/haema-dev/cloud-gateway:1affb44e1d64ca61231be2aea9cf593d9e850ab4
         ports:
         - containerPort: 8080
-        # 2026년 기준 리소스 제한 (32GB RAM 노드 최적화)
         resources:
           limits:
             cpu: "500m"
@@ -26,13 +25,16 @@ spec:
           requests:
             cpu: "250m"
             memory: "256Mi"
-        # Actuator를 활용한 상태 체크
-        livenessProbe:
-          httpGet:
-            path: /actuator/health/liveness
-            port: 8080
-          initialDelaySeconds: 45
-        readinessProbe:
-          httpGet:
-            path: /actuator/health/readiness
-            port: 8080
+        # livenessProbe:
+        #   httpGet:
+        #     path: /ping
+        #     port: 8080
+        #   initialDelaySeconds: 30
+        #   periodSeconds: 21600      # 6시간 (하루 4번)
+        #   timeoutSeconds: 10
+        # readinessProbe:
+        #   httpGet:
+        #     path: /ping
+        #     port: 8080
+        #   initialDelaySeconds: 15
+        #   periodSeconds: 21600      # 6시간 (하루 4번)

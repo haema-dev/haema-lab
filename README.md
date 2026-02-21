@@ -48,11 +48,11 @@
 ```bash
 repo/
   ├── .github/workflows/
-  │             ├── bootstrap.yml           # Kubespray → k8s + Ansible
-  │             ├── argocd-setup.yml        # ArgoCD
+  │             ├── bootstrap.yaml           # Kubespray → k8s + Ansible
+  │             ├── argocd-setup.yaml        # ArgoCD
   │             ├── deploy-gateway.yml
+  │             ├── deploy-frontend.yml
   │             ├── deploy-backend.yml
-  │             ├── deploy-front.yml
   │             └── deploy-models.yml
   │
   ├── apps/
@@ -62,13 +62,15 @@ repo/
   │     └── models/     # Python + FastAPI
   │
   ├── argocd/
+  │     ├── gateway.yaml
+  │     ├── frontend.yaml
   │     └── root-app.yaml
   │
   ├── manifests/
   │     ├── gateway/          # Kotlin + Spring
   │     ├── frontend/         # Typescript + React
   │     ├── backend/          # Python + Django
-  │     ├── models/           # Python + FastAPI
+  │     └── models/           # Python + FastAPI
   │
   └── README.md
 ```
