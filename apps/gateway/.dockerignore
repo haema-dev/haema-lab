@@ -1,0 +1,27 @@
+# 1. 빌드 도구 및 캐시 (무가치함)
+.gradle/
+build/*
+!build/libs/*.jar
+
+# 2. 소스 코드 (이미 JAR로 컴파일되었으므로 불필요)
+src/
+bin/
+
+# 3. IDE 및 OS 설정 파일 (시스템 오염 방지)
+.idea/
+.vscode/
+*.iml
+.DS_Store
+*.swp
+out/
+
+# 4. 로그 및 임시 파일 (기록 말살)
+*.log
+.history/
+tmp/
+
+# 5. 버전 관리 및 Docker 설정 자체
+.git/
+.gitignore
+Dockerfile
+.dockerignore
