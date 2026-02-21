@@ -16,10 +16,13 @@ class RouteConfig {
             // 1. 상태 점검용
             route("health_check") {
                 path("/ping")
-                filters { setStatus(200) }
-                // 'no-need-url' 대신 유효한 URI를 사용하라!
-                // 필터에서 200을 뱉으므로 실제 연결은 되지 않으나 형식은 지켜야 한다.
-                uri("forward:///health-check-dummy")
+                filters {
+                    // 즉시 200 상태를 하달하라!
+                    setStatus(200)
+                }
+                // 내부 리다이렉트를 하지 말고, 아무 일도 하지 않는 가짜 URI를 줘라.
+                // forward 대신 실제 존재하지 않는 빈 주소를 주는 것이 루프를 막는 방법이다.
+                uri("no-op://dummmy")
             }
 
             // 2. ArgoCD
