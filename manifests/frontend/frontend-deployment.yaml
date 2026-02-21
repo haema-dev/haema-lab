@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloud-frontend
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cloud-frontend
+  template:
+    metadata:
+      labels:
+        app: cloud-frontend
+    spec:
+      containers:
+      - name: frontend
+        image: ghcr.io/haema-dev/cloud-frontend:latest # 프론트 이미지로 수정
+        ports:
+        - containerPort: 3000 # Vite 기본 포트
+        resources:
+          limits:
+            cpu: "200m"
+            memory: "256Mi"
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+        livenessProbe: # Actuator 제거, 루트 경로로 체크
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
