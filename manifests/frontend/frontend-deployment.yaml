@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: ghcr.io/haema-dev/cloud-frontend:7c98d5faf6f345a1bde1d9c0c76346a4ef6755fa
+        image: ghcr.io/haema-dev/cloud-frontend:latest
         ports:
         - containerPort: 3000 # Vite 기본 포트
         resources:
