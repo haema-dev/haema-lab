@@ -13,11 +13,4 @@ class HealthController {
     fun ping(): ResponseEntity<String> {
         return ResponseEntity.ok("OK") // 즉시 200 OK와 함께 "OK" 반환
     }
-
-    @GetMapping("/admin/argocd")
-    fun argocd(): ResponseEntity<Void> {
-        return ResponseEntity.status(HttpStatus.TEMPORARY_REDIRECT)
-            .location(URI.create("http://argocd-server.argocd.svc.cluster.local"))
-            .build()
-    }
 }
