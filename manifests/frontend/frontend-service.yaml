@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloud-frontend-svc
+  namespace: default
+spec:
+  type: ClusterIP # 외부 노출 금지 (Gateway만 접근 가능)
+  selector:
+    app: cloud-frontend
+  ports:
+    - port: 80 # Gateway가 찌를 포트
+      targetPort: 3000 # 프론트엔드 컨테이너의 실제 포트
