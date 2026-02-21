@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root-application
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/haema-dev/haema-lab.git
+    targetRevision: master
+    path: argocd # 반드시 ArgoCD App 파일들이 있는 경로를 지정하라!
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd # Root App 자신은 argocd 네임스페이스에 존재해야 함
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
