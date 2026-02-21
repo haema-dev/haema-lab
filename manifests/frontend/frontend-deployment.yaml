@@ -15,9 +15,9 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: ghcr.io/haema-dev/cloud-frontend:latest # 프론트 이미지로 수정
+        image: ghcr.io/haema-dev/cloud-frontend:latest
         ports:
-        - containerPort: 3000 # Vite 기본 포트
+        - containerPort: 80
         resources:
           limits:
             cpu: "200m"
@@ -25,12 +25,12 @@ spec:
           requests:
             cpu: "100m"
             memory: "128Mi"
-        livenessProbe: # Actuator 제거, 루트 경로로 체크
+        livenessProbe:
           httpGet:
             path: /
-            port: 3000
+            port: 80
           initialDelaySeconds: 10
         readinessProbe:
           httpGet:
             path: /
-            port: 3000
+            port: 80
