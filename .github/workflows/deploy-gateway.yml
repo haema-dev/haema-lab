@@ -2,10 +2,10 @@ name: "Step 3 [gateway]: Deploy Spring Cloud Gateway to GHCR"
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ master ]
-    paths:
-      - 'apps/gateway/**'
+  # push:
+  #   branches: [ master ]
+  #   paths:
+  #     - 'apps/gateway/**'
 
 jobs:
   build-and-deploy:
