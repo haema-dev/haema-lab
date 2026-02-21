@@ -19,7 +19,17 @@ class RouteConfig {
                 uri("http://cloud-frontend-svc.default.svc.cluster.local")
             }
 
-            // 2.백엔드 API (가장 구체적인 경로를 우선 배치)
+            // 2. ArgoCD
+            route("argocd_route") {
+                order(-1)
+                path("/admin/argocd", "/admin/argocd/", "/admin/argocd/**")
+                filters {
+                    stripPrefix(2)
+                }
+                uri("http://argocd-server.argocd.svc.cluster.local")
+            }
+
+            // 3.백엔드 API (가장 구체적인 경로를 우선 배치)
 //            route("backend_service") {
 //                path("/api/v1/**")
 //                filters {
