@@ -1,62 +1,69 @@
+# [SYSTEM & IDE]
+.DS_Store
+Thumbs.db
+*.sw?
+*.swo
+*.swp
+*~
+.idea/
+.vscode/
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# [ROOT DIRECTORY]
+myenv/
+data/
 README2.md
+# 주의: requirements.txt는 관습적으로 ignore하지 않으나 요청에 따라 유지함.
+
+# [SHARED MODULES]
 sllm/
 embedding/
 crawling/
-data/
-myenv/
-requirements.txt
 
-# Gateway
+# [APPS: GATEWAY (Gradle/Kotlin)]
 apps/gateway/HELP.md
-apps/gateway/.gradle
+apps/gateway/.gradle/
 apps/gateway/build/
-apps/gateway/!gradle/wrapper/gradle-wrapper.jar
-apps/gateway/!**/src/main/**/build/
-apps/gateway/!**/src/test/**/build/
-### IntelliJ IDEA ###
-apps/gateway/.idea
+apps/gateway/out/
+apps/gateway/bin/
+apps/gateway/.kotlin/
 apps/gateway/*.iws
 apps/gateway/*.iml
 apps/gateway/*.ipr
-apps/gateway/out/
-apps/gateway/bin
-apps/gateway/!**/src/main/**/out/
-apps/gateway/!**/src/test/**/out/
-### Kotlin ###
-apps/gateway/.kotlin
+# Exception for wrapper
+apps/gateway/!gradle/wrapper/gradle-wrapper.jar
+# Nested builds
+apps/gateway/**/src/main/**/build/
+apps/gateway/**/src/test/**/build/
+apps/gateway/**/src/main/**/out/
+apps/gateway/**/src/test/**/out/
 
-
-
-# Backend
+# [APPS: BACKEND (Python)]
 apps/backend/.venv/
-apps/backend/config/__pycache__/
-apps/backend/core/__pycache__/
 apps/backend/.env
+apps/backend/**/__pycache__/
 
-
-# Frontend
-# Logs
-apps/frontend/logs
-apps/frontend/*.log
-apps/frontend/npm-debug.log*
-apps/frontend/yarn-debug.log*
-apps/frontend/yarn-error.log*
-apps/frontend/pnpm-debug.log*
-apps/frontend/lerna-debug.log*
-
-apps/frontend/node_modules
-apps/frontend/dist
-apps/frontend/dist-ssr
+# [APPS: FRONTEND (Node/Vite)]
+apps/frontend/node_modules/
+apps/frontend/dist/
+apps/frontend/dist-ssr/
 apps/frontend/*.local
+apps/frontend/.env
+apps/frontend/.env.local
+apps/frontend/.env.*.local
+apps/frontend/tsconfig.tsbuildinfo
+apps/frontend/vite.config.d.ts
+apps/frontend/vite.config.d.ts.map
 
-# Editor directories and files
-apps/frontend/.vscode/*
-apps/frontend/!.vscode/extensions.json
-apps/frontend/.idea
-apps/frontend/.DS_Store
-apps/frontend/*.suo
-apps/frontend/*.ntvs*
-apps/frontend/*.njsproj
-apps/frontend/*.sln
-apps/frontend/*.sw?
-apps/frontend/package-lock.json
+# [LOGS]
+*.log
+apps/frontend/logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*

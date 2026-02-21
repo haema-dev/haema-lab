@@ -1,0 +1,417 @@
+/* App.css */
+
+/* ============================================= */
+/*  메인 레이아웃 (사이드바 + 콘텐츠)               */
+/* ============================================= */
+.app-container {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  /* 모바일 주소창 고려 */
+  background-color: var(--color-hardware-base);
+  position: relative;
+  overflow: hidden;
+}
+
+/* ============================================= */
+/*  사이드바 스타일                                */
+/* ============================================= */
+.sidebar-aside {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: #15151a;
+  border-right: 3px solid #000;
+  color: var(--color-secondary-cyan);
+  box-shadow: inset -5px 0 10px rgba(0, 0, 0, 0.5);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    padding 0.3s ease;
+  overflow: hidden;
+  position: relative;
+  z-index: 10;
+}
+
+.sidebar-aside.open {
+  width: 220px;
+  padding: 16px;
+  overflow: visible;
+}
+
+.sidebar-aside.closed {
+  width: 44px;
+  padding: 16px 0;
+  align-items: center;
+}
+
+/* --- 토글 버튼 --- */
+.sidebar-hw-toggle {
+  flex-shrink: 0;
+  width: 100%;
+  height: 28px;
+  background: transparent;
+  border: 1px solid rgba(77, 182, 172, 0.3);
+  color: var(--color-secondary-cyan);
+  border-radius: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  margin-bottom: 16px;
+}
+
+.sidebar-hw-toggle:hover {
+  background: var(--color-secondary-cyan);
+  color: #15151a;
+  border-color: var(--color-secondary-cyan);
+}
+
+.sidebar-aside.closed .sidebar-hw-toggle {
+  width: 28px;
+  margin-bottom: 12px;
+}
+
+/* --- 사이드바 내부 콘텐츠 --- */
+.sidebar-inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: opacity 0.2s ease;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  /* flex 오버플로 방지 */
+}
+
+.sidebar-inner.collapsed {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sidebar-nav-section {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  width: 90%;
+}
+
+.sidebar-title {
+  color: var(--color-primary-amber);
+  border-bottom: 1px solid var(--color-primary-amber);
+  padding-bottom: 6px;
+  margin: 0 0 12px 0;
+  font-size: 0.75rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.sidebar-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+/* --- 하단 상태 정보 --- */
+.sidebar-status {
+  flex-shrink: 0;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid #27272a;
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #71717a;
+}
+
+.sidebar-status p {
+  margin: 0 0 4px 0;
+  line-height: 1.4;
+}
+
+.sidebar-status .status-secure {
+  color: #10b981;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.sidebar-status .status-battery {
+  color: var(--color-primary-amber);
+  margin-top: 6px;
+}
+
+/* ============================================= */
+/*  메인 단말기 영역                               */
+/* ============================================= */
+.main-terminal-wrapper {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  background: linear-gradient(to bottom, var(--color-hardware-bezel), var(--color-hardware-base));
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 0 2px rgba(255, 255, 255, 0.05) inset;
+}
+
+/* 모바일 하단 베젤 (장식용) - PC에서는 숨김 */
+.mobile-nav-bezel {
+  display: none;
+}
+
+.indicator-light {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #333;
+  border: 1px solid #111;
+}
+
+.indicator-light.red {
+  background-color: #500;
+  box-shadow: 0 0 5px #f00;
+}
+
+.indicator-light.green {
+  background-color: #050;
+  box-shadow: 0 0 5px #0f0;
+}
+
+.blinking {
+  animation: blink-animation 2s infinite;
+}
+
+@keyframes blink-animation {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* ============================================= */
+/*  시스템 네비게이션 링크                          */
+/* ============================================= */
+.sys-nav-link {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #27272a;
+  color: #a1a1aa;
+  font-size: 0.7rem;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+  text-align: center;
+}
+
+.sys-nav-link:hover {
+  border-color: #164e63;
+  color: var(--color-secondary-cyan);
+  background-color: rgba(8, 51, 68, 0.3);
+}
+
+.sys-nav-link.active {
+  background-color: rgba(8, 51, 68, 0.8);
+  border-color: var(--color-secondary-cyan);
+  color: #67e8f9;
+  box-shadow: inset 0 0 10px rgba(34, 211, 238, 0.2);
+}
+
+/* ============================================= */
+/*  로그인 프레임 (인증 전 화면 — 모바일 잘림 방지)  */
+/* ============================================= */
+.login-frame-wrapper {
+  width: 100%;
+  max-width: 800px;
+  /* 고정 높이 대신 유동적 높이 + 스크롤 가능 */
+  flex: 1;
+  min-height: 0;
+  margin: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 768px) {
+  .login-frame-wrapper {
+    padding: 2rem;
+    max-height: 90vh;
+  }
+}
+
+/* ============================================= */
+/*  플레이스홀더 화면 (미구현 라우트)               */
+/* ============================================= */
+.placeholder-screen {
+  padding: 1.5rem;
+  font-weight: bold;
+  font-size: 0.875rem;
+  letter-spacing: 0.05em;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.placeholder-screen.cyan {
+  color: #22d3ee;
+}
+
+.placeholder-screen.amber {
+  color: #f59e0b;
+  animation: none;
+}
+
+.placeholder-screen.red {
+  color: #ef4444;
+  animation: none;
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* ============================================= */
+/*  부트 시퀀스 스타일                             */
+/* ============================================= */
+.boot-sequence-container {
+  width: 20rem;
+  background-color: #000;
+  border: 2px solid rgba(8, 145, 178, 0.5);
+  padding: 1.5rem;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 10px;
+  color: #22d3ee;
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.2);
+}
+
+.boot-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.boot-log-line {
+  margin: 0;
+}
+
+.boot-cursor {
+  width: 0.5rem;
+  height: 0.75rem;
+  background-color: #22d3ee;
+  margin-top: 0.25rem;
+}
+
+/* ============================================= */
+/*  반응형 미디어 쿼리 (모바일/태블릿)              */
+/* ============================================= */
+@media (max-width: 768px) {
+  .app-container {
+    flex-direction: column;
+  }
+
+  .sidebar-aside {
+    position: fixed;
+    z-index: 50;
+    height: 100%;
+    left: 0;
+    top: 0;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      padding 0.3s ease,
+      transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .sidebar-aside.closed {
+    transform: translateX(-100%);
+  }
+
+  .sidebar-aside.open {
+    width: 80vw;
+    transform: translateX(0);
+  }
+
+  /* 모바일: 사이드바 닫힌 상태에서 열기 버튼 */
+  .mobile-sidebar-open-btn {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 40;
+    width: 36px;
+    height: 36px;
+    background: rgba(21, 21, 26, 0.9);
+    border: 1px solid rgba(77, 182, 172, 0.4);
+    color: var(--color-secondary-cyan);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    backdrop-filter: blur(4px);
+    transition: background 0.2s, border-color 0.2s;
+  }
+
+  .mobile-sidebar-open-btn:hover {
+    background: var(--color-secondary-cyan);
+    color: #15151a;
+    border-color: var(--color-secondary-cyan);
+  }
+
+  /* 모바일: 사이드바 열릴 때 배경 오버레이 */
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  .main-terminal-wrapper {
+    padding: 8px;
+    flex: 1;
+  }
+
+  .mobile-nav-bezel {
+    display: flex;
+    height: 50px;
+    background: var(--color-hardware-bezel);
+    margin: 0 -8px -8px -8px;
+    border-top: 2px solid #000;
+    box-shadow: inset 0 5px 10px rgba(0, 0, 0, 0.5);
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 20px;
+  }
+
+  .login-frame-wrapper {
+    padding: 0.5rem;
+    max-height: none;
+  }
+}
+
+/* PC에서는 모바일 전용 요소 숨김 */
+@media (min-width: 769px) {
+  .mobile-sidebar-open-btn {
+    display: none;
+  }
+
+  .sidebar-overlay {
+    display: none;
+  }
+}

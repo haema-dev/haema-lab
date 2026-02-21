@@ -13,7 +13,7 @@ jobs:
       - name: 📖 Read Application Manifest
         id: read_file
         run: |
-          CONTENT=$(cat manifests/argocd-app.yaml)
+          CONTENT=$(cat argocd/root-app.yaml)
           echo "ROOT_APP_CONTENT<<EOF" >> $GITHUB_ENV
           echo "$CONTENT" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV

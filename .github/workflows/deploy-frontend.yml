@@ -1,0 +1,74 @@
+name: "Step 3 [frontend]: Deploy React(Vite) to GHCR"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master ]
+    paths:
+      - 'apps/frontend/**'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1. pnpm 설치
+      - name: 📦 Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: '10.29.3'
+          run_install: false
+
+      # 2. Node.js 셋업 및 pnpm 캐시 적용
+      - name: 🟢 Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.14.0'
+          cache: 'pnpm'
+          cache-dependency-path: apps/frontend/pnpm-lock.yaml
+
+      # 3. 의존성 설치 및 Vite 빌드
+      - name: 🔨 Build Frontend (pnpm + Vite)
+        run: |
+          cd apps/frontend
+          pnpm install
+          pnpm run build
+
+      # 4. GHCR 로그인
+      - name: 🔐 Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 5. Docker 이미지 빌드 및 푸시
+      - name: 🐳 Build and Push Docker Image
+        run: |
+          IMAGE_NAME=$(echo "ghcr.io/${{ github.repository_owner }}/cloud-frontend" | tr '[:upper:]' '[:lower:]')
+          TAG=${{ github.sha }}
+          # Dockerfile은 apps/frontend/ 경로에 있어야 함
+          docker build -t $IMAGE_NAME:$TAG -t $IMAGE_NAME:latest ./apps/frontend
+          docker push $IMAGE_NAME:$TAG
+          docker push $IMAGE_NAME:latest
+
+      # 6. K8s 매니페스트 태그 자동 수정 
+      - name: 📝 Update K8s Manifest
+        run: |
+          TARGET_FILE="manifests/frontend/frontend-deployment.yaml"
+          # 이미지 태그 업데이트
+          sed -i "s|image: ghcr.io/.*|image: ghcr.io/${{ github.repository_owner }}/cloud-frontend:${{ github.sha }}|g" $TARGET_FILE
+          git add $TARGET_FILE
+
+      # 7. GitOps 엔진(ArgoCD)을 위한 커밋
+      - name: 🚀 Commit and Push
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: update frontend image tag to ${{ github.sha }}"
+          git push

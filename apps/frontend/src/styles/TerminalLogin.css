@@ -1,0 +1,198 @@
+/* TerminalLogin.css */
+
+.login-container {
+  position: relative;
+  width: 90%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  background-color: #09090b;
+  overflow-y: auto;
+}
+
+.login-bg-texture {
+  position: absolute;
+  inset: 0;
+  opacity: 0.1;
+  background-image: url('https://www.transparenttextures.com/patterns/carbon-fibre.png');
+  pointer-events: none;
+}
+
+.login-content-wrapper {
+  width: 100%;
+  max-width: 28rem;
+  max-height: calc(100vh - 10rem);
+  max-height: calc(100dvh - 10rem);
+  overflow-y: auto;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  position: relative;
+  z-index: 20;
+  padding: 2rem 0 4rem;
+}
+
+.login-header {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.login-header h2 {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #67e8f9;
+  letter-spacing: -0.05em;
+  text-transform: uppercase;
+  margin: 0;
+  text-shadow: 0 0 10px rgba(103, 232, 249, 0.8);
+}
+
+@media (min-width: 768px) {
+  .login-header h2 {
+    font-size: 1.875rem;
+  }
+}
+
+.header-divider {
+  height: 2px;
+  width: 4rem;
+  background-color: #0891b2;
+  box-shadow: 0 0 10px rgba(8, 145, 178, 1);
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.input-group label {
+  font-size: 0.7rem;
+  color: #0e7490;
+  text-transform: uppercase;
+  font-weight: bold;
+  letter-spacing: 0.1em;
+}
+
+.protocol-input {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  background-color: #000;
+  border: 2px solid rgba(8, 145, 178, 0.5);
+  padding: 1rem;
+  color: #22d3ee;
+  border-radius: 0.75rem;
+  text-align: center;
+  font-size: 1.25rem;
+  letter-spacing: 1em;
+  outline: none;
+  transition: border-color 0.2s;
+  box-shadow: inset 0 0 20px rgba(8, 145, 178, 0.2);
+  font-family: inherit;
+}
+
+.protocol-input:focus {
+  border-color: #22d3ee;
+}
+
+.protocol-input::placeholder {
+  color: rgba(34, 211, 238, 0.3);
+}
+
+.error-message {
+  color: #ef4444;
+  font-size: 0.75rem;
+  text-align: center;
+  font-weight: bold;
+  animation: crt-flicker 1s infinite;
+  text-shadow: 0 0 5px rgba(239, 68, 68, 0.8);
+}
+
+/* 로그인 제출 버튼 */
+.login-submit-btn {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  position: relative;
+  padding: 1rem 1.5rem;
+  background-color: #18181b;
+  border: none;
+  border-bottom: 4px solid #164e63;
+  color: #22d3ee;
+  transition: all 0.2s;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  overflow: hidden;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+  font-family: inherit;
+}
+
+.login-submit-btn:hover:not(.verifying) {
+  color: #67e8f9;
+  border-bottom-color: #155e75;
+}
+
+.login-submit-btn:active:not(.verifying) {
+  border-bottom-width: 0;
+  transform: translateY(2px);
+}
+
+.login-submit-btn.verifying {
+  border-bottom-color: #27272a;
+  color: #71717a;
+  cursor: wait;
+}
+
+.login-submit-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.05);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.login-submit-btn:hover::before {
+  opacity: 1;
+}
+
+.btn-label {
+  position: relative;
+  z-index: 10;
+  font-size: 0.7rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  text-shadow: 0 0 8px currentColor;
+}
+
+.system-feed-container {
+  padding-top: 2rem;
+  border-top: 1px solid #18181b;
+}
+
+.feed-title {
+  font-size: 10px;
+  color: #52525b;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+  letter-spacing: 0.1em;
+}
+
+.feed-logs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
