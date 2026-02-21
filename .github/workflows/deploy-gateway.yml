@@ -2,35 +2,35 @@ name: "Step 3 [gateway]: Deploy Spring Cloud Gateway to GHCR"
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ master ]
-    paths:
-      - 'apps/gateway/**' # 게이트웨이 코드가 바뀔 때만 작동
+  # push:
+  #   branches: [ master ]
+  #   paths:
+  #     - 'apps/gateway/**'
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      packages: write # GHCR에 이미지를 올리기 위한 권한
+      packages: write
 
     steps:
       - uses: actions/checkout@v4
 
-      # 1. Java/Kotlin 빌드 (Gradle 사용)
+      # 1. Java/Kotlin 빌드
       - name: ☕ Set up JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: 'gradle' # 이 줄을 추가하면 빌드 속도가 비약적으로 빨라집니다.
+          cache: 'gradle'
 
       - name: 🔨 Build with Gradle
         run: |
           chmod +x apps/gateway/gradlew
           ./apps/gateway/gradlew -p apps/gateway clean build -x test
 
-      # 2. GHCR 로그인 (별도 Secret 필요 없음, 자동 제공됨)
+      # 2. GHCR 로그인
       - name: 🔐 Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -41,6 +41,7 @@ jobs:
       # 3. Docker 이미지 빌드 및 푸시
       - name: 🐳 Build and Push Docker Image
         run: |
+          # 이미지 이름을 소문자로 강제 변환 (GHCR 규격)
           IMAGE_NAME=$(echo "ghcr.io/${{ github.repository_owner }}/cloud-gateway" | tr '[:upper:]' '[:lower:]')
           TAG=${{ github.sha }}
           docker build -t $IMAGE_NAME:$TAG -t $IMAGE_NAME:latest ./apps/gateway
@@ -50,14 +51,16 @@ jobs:
       # 4. K8s 매니페스트 태그 자동 수정 (GitOps 핵심)
       - name: 📝 Update K8s Manifest
         run: |
-          sed -i "s|image: ghcr.io/.*|image: ghcr.io/${{ github.repository_owner }}/cloud-gateway:${{ github.sha }}|g" manifests/apps/gateway/deployment.yaml
-          git add manifests/apps/gateway/deployment.yaml
+          TARGET_FILE="manifests/gateway/gateway-deployment.yaml"
+          # 이미지 태그 업데이트
+          sed -i "s|image: ghcr.io/.*|image: ghcr.io/${{ github.repository_owner }}/cloud-gateway:${{ github.sha }}|g" $TARGET_FILE
+          git add $TARGET_FILE
 
-      # 5. 변경된 태그를 Git에 커밋 (이걸 보고 ArgoCD가 움직입니다)
+      # 5. 변경된 태그를 Git에 커밋
       - name: 🚀 Commit and Push
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add manifests/apps/gateway/deployment.yaml
+          # 4번 단계에서 이미 add 했으므로 바로 커밋
           git commit -m "chore: update gateway image tag to ${{ github.sha }}"
           git push

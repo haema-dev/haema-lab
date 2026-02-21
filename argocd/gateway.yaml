@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://github.com/haema-dev/haema-lab.git
     targetRevision: master
-    path: manifests/apps # 실제 k8s 파일이 있는 경로
+    path: manifests/gateway # 실제 k8s 파일이 있는 경로
     directory:
       recurse: true
   destination:
