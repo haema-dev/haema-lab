@@ -30,7 +30,7 @@ class RouteConfig {
                 uri("http://cloud-frontend-svc.default.svc.cluster.local")
             }
 
-            // 3. 상태 점검용 (문제의 구간)
+            // 3. 상태 점검용
             route("health_check") {
                 path("/ping")
                 filters { setStatus(200) }
