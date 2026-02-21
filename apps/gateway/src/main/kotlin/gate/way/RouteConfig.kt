@@ -24,12 +24,12 @@ class RouteConfig {
 
             // 2. ArgoCD
             route("argocd_route") {
-                path("/admin/argocd", "/admin/argocd/**")
+                path("/admin/argocd", "/admin/argocd/", "/admin/argocd/**")
                 filters {
-                    // /admin/argocd 두 마디를 자르기
+                    // 2. /admin/argocd 2마디 자르기
                     stripPrefix(2)
                 }
-                uri("http://192.168.45.24:30119")
+                uri("http://argocd-server.argocd.svc.cluster.local:80")
             }
 
             // 3. 프론트엔드 (나머지 모든 경로 /**)
