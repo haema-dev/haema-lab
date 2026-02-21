@@ -23,15 +23,15 @@ class RouteConfig {
             }
 
             // 2. ArgoCD
-            route("argocd_route") {
-                order(-1)
-                path("/admin/argocd", "/admin/argocd/", "/admin/argocd/**")
-                filters {
-                    //  /admin/argocd 2마디 자르기
-                    stripPrefix(2)
-                }
-                uri("http://argocd-server.argocd.svc.cluster.local:80")
-            }
+//            route("argocd_route") {
+//                order(-1)
+//                path("/admin/argocd", "/admin/argocd/", "/admin/argocd/**")
+//                filters {
+//                    //  /admin/argocd 2마디 자르기
+//                    stripPrefix(2)
+//                }
+//                uri("http://argocd-server.argocd.svc.cluster.local:80")
+//            }
 
             // 3. 프론트엔드 (나머지 모든 경로 /**)
             route("frontend_route") {
