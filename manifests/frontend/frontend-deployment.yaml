@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: ghcr.io/haema-dev/cloud-frontend:76ec3932f951fc50d6468002e4f85a560896d827
+        image: ghcr.io/haema-dev/cloud-frontend:341c02f46cdda8e718f920f43d14671bfd0206ed
         ports:
         - containerPort: 80
         resources:
