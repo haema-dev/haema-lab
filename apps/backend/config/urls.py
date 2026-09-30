@@ -21,5 +21,6 @@ from core import views  # <-- 우리가 만든 core 앱의 views를 가져옵니
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('home/', views.home),  # <-- admin.site.urls 대신 views.home으로 변경!
+    path('home/', views.home),
+    path('api/rag/chat', views.rag_chat),
 ]

@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -20,7 +21,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-e-!1yd*q&bljkkn*)@@*a#u5y&yn119*xs@^$$7d-yh@--8pgg'
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -113,5 +114,26 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
-
 STATIC_URL = 'static/'
+
+# Ollama/RAG
+# GitHub Actions can inject these through `secrets` or `vars`; no credential is
+# stored in the repository. The URL is intentionally required at runtime.
+OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+OLLAMA_CHAT_MODEL = os.getenv('OLLAMA_CHAT_MODEL', 'qwen3.5:27b')
+OLLAMA_EMBEDDING_MODEL = os.getenv('OLLAMA_EMBEDDING_MODEL', 'qwen3-embedding:0.6b')
+
+OLLAMA_NUM_CTX = int(os.getenv('OLLAMA_NUM_CTX', '8192'))
+OLLAMA_NUM_PREDICT = int(os.getenv('OLLAMA_NUM_PREDICT', '256'))
+OLLAMA_KEEP_ALIVE = os.getenv('OLLAMA_KEEP_ALIVE', '30m')
+OLLAMA_THINK = os.getenv('OLLAMA_THINK', 'false').lower() in {
+    '1', 'true', 'yes', 'on'
+}
+OLLAMA_QUERY_INSTRUCTION = os.getenv('OLLAMA_QUERY_INSTRUCTION') or None
+
+# RAG API limits
+# Prompt processing is ~70 tok/s, so every retrieved document (~300 tokens) adds ~4s to TTFT.
+RAG_TOP_K = int(os.getenv('RAG_TOP_K', '2'))
+RAG_MAX_QUESTION_CHARS = int(os.getenv('RAG_MAX_QUESTION_CHARS', '500'))
+# Per process; one iGPU cannot run parallel generations without slowing each one down.
+RAG_MAX_CONCURRENT_GENERATIONS = int(os.getenv('RAG_MAX_CONCURRENT_GENERATIONS', '1'))

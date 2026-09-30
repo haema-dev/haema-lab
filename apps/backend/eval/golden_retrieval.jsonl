@@ -1,0 +1,16 @@
+{"id": "q001", "type": "numeric", "question": "2026년 8월 한국은행 기준금리 인상 후 수준은 몇 퍼센트야?", "relevant_ids": ["evt_20260827_01"]}
+{"id": "q002", "type": "numeric", "question": "2026년 7월 한국은행이 기준금리를 몇 bp 올렸어?", "relevant_ids": ["evt_20260716_01"]}
+{"id": "q003", "type": "numeric", "question": "2025년 9월 FOMC 결정 후 연방기금금리 목표 범위는?", "relevant_ids": ["evt_20250917_01"]}
+{"id": "q004", "type": "numeric", "question": "2025년 10월 29일 연준이 내린 뒤 목표 범위 상단은?", "relevant_ids": ["evt_20251029_02"]}
+{"id": "q005", "type": "numeric", "question": "2025년 12월 FOMC 인하 폭은 몇 bp였나?", "relevant_ids": ["evt_20251210_01"]}
+{"id": "q006", "type": "numeric", "question": "2025년 10월 금통위에서 결정한 기준금리 수준은?", "relevant_ids": ["evt_20251023_01"]}
+{"id": "q007", "type": "numeric", "question": "2026년 2월 한국은행 기준금리는 몇 퍼센트로 유지됐어?", "relevant_ids": ["evt_20260226_01"]}
+{"id": "q008", "type": "numeric", "question": "2026년 1월 미국 연방기금금리 목표 범위 하단은?", "relevant_ids": ["evt_20260128_01"]}
+{"id": "q009", "type": "context", "question": "한국은행이 기준금리를 인상한 결정들을 알려줘", "relevant_ids": ["evt_20260716_01", "evt_20260827_01"]}
+{"id": "q010", "type": "context", "question": "미국 연준이 금리를 인하한 FOMC 회의는 언제였어?", "relevant_ids": ["evt_20250917_01", "evt_20251029_02", "evt_20251210_01"]}
+{"id": "q011", "type": "context", "question": "한국은행 금융통화위원회가 금리를 동결한 회의를 찾아줘", "relevant_ids": ["evt_20251023_01", "evt_20260226_01"]}
+{"id": "q012", "type": "context", "question": "2026년 3월 FOMC 통화정책 성명 내용은?", "relevant_ids": ["evt_20260318_01"]}
+{"id": "q013", "type": "context", "question": "2026년 4월 미국 통화정책 결정은 어땠어?", "relevant_ids": ["evt_20260429_01"]}
+{"id": "q014", "type": "context", "question": "2026년 6월 연준 회의 결과 알려줘", "relevant_ids": ["evt_20260617_01"]}
+{"id": "q015", "type": "context", "question": "2026년 7월 말 FOMC 결정은 무엇이었나?", "relevant_ids": ["evt_20260729_02"]}
+{"id": "q016", "type": "context", "question": "Fed funds rate가 3.50~3.75%로 동결된 회의들", "relevant_ids": ["evt_20260128_01", "evt_20260318_01", "evt_20260429_01", "evt_20260617_01", "evt_20260729_02"]}
