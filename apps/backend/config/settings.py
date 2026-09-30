@@ -123,7 +123,7 @@ OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
 OLLAMA_CHAT_MODEL = os.getenv('OLLAMA_CHAT_MODEL', 'qwen3.5:27b')
 OLLAMA_EMBEDDING_MODEL = os.getenv('OLLAMA_EMBEDDING_MODEL', 'qwen3-embedding:0.6b')
 
-OLLAMA_NUM_CTX = int(os.getenv('OLLAMA_NUM_CTX', '8192'))
+OLLAMA_NUM_CTX = int(os.getenv('OLLAMA_NUM_CTX', '4096'))
 OLLAMA_NUM_PREDICT = int(os.getenv('OLLAMA_NUM_PREDICT', '256'))
 OLLAMA_KEEP_ALIVE = os.getenv('OLLAMA_KEEP_ALIVE', '30m')
 OLLAMA_THINK = os.getenv('OLLAMA_THINK', 'false').lower() in {
@@ -134,6 +134,6 @@ OLLAMA_QUERY_INSTRUCTION = os.getenv('OLLAMA_QUERY_INSTRUCTION') or None
 # RAG API limits
 # Prompt processing is ~70 tok/s, so every retrieved document (~300 tokens) adds ~4s to TTFT.
 RAG_TOP_K = int(os.getenv('RAG_TOP_K', '2'))
-RAG_MAX_QUESTION_CHARS = int(os.getenv('RAG_MAX_QUESTION_CHARS', '500'))
+RAG_MAX_QUESTION_CHARS = int(os.getenv('RAG_MAX_QUESTION_CHARS', '300'))
 # Per process; one iGPU cannot run parallel generations without slowing each one down.
 RAG_MAX_CONCURRENT_GENERATIONS = int(os.getenv('RAG_MAX_CONCURRENT_GENERATIONS', '1'))
