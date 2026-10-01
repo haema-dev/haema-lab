@@ -39,17 +39,17 @@ spec:
         - name: DB_PORT
           valueFrom:
             secretKeyRef: { name: backend-secret, key: DB_PORT }
-        - name: REDIS_URL           # 비밀번호가 들어 있어 통째로 Secret
-          valueFrom:
-            secretKeyRef: { name: backend-secret, key: REDIS_URL }
+        # - name: REDIS_URL           # 비밀번호가 들어 있어 통째로 Secret
+        #   valueFrom:
+        #     secretKeyRef: { name: backend-secret, key: REDIS_URL }
         - name: DJANGO_DEBUG
           value: "0"
         # Gateway 는 대상 서비스 DNS 를 Host 로 넘긴다. localhost 는 아래 프로브용.
         - name: DJANGO_ALLOWED_HOSTS
           value: "cloud-backend-svc,cloud-backend-svc.default.svc.cluster.local,localhost"
         # 모델 게이트웨이(apps/ai). 클러스터 안 주소만 쓴다.
-        - name: FASTAPI_BASE_URL
-          value: "http://cloud-ai-svc.default.svc.cluster.local"
+        # - name: FASTAPI_BASE_URL
+        #   value: "http://cloud-ai-svc.default.svc.cluster.local"
         resources:
           # 값은 추정이며 측정 전이다 (gunicorn 워커 2개 기준).
           limits:
@@ -58,22 +58,22 @@ spec:
           requests:
             cpu: "100m"
             memory: "192Mi"
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 8000
-            httpHeaders:
-            - name: Host
-              value: localhost   # 프로브는 파드 IP 를 Host 로 보내 ALLOWED_HOSTS 에 막힌다
-          initialDelaySeconds: 10
-          periodSeconds: 10
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8000
-            httpHeaders:
-            - name: Host
-              value: localhost
-          initialDelaySeconds: 30
-          periodSeconds: 30
-          timeoutSeconds: 5
+        # readinessProbe:
+        #   httpGet:
+        #     path: /health
+        #     port: 8000
+        #     httpHeaders:
+        #     - name: Host
+        #       value: localhost   # 프로브는 파드 IP 를 Host 로 보내 ALLOWED_HOSTS 에 막힌다
+        #   initialDelaySeconds: 10
+        #   periodSeconds: 10
+        # livenessProbe:
+        #   httpGet:
+        #     path: /health
+        #     port: 8000
+        #     httpHeaders:
+        #     - name: Host
+        #       value: localhost
+        #   initialDelaySeconds: 30
+        #   periodSeconds: 30
+        #   timeoutSeconds: 5

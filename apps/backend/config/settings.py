@@ -22,7 +22,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-it$0vp$h^@_v1q9bypr1fbvs=y59le0pn&&hubb5%t$s!v$0(7'
+SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -134,7 +134,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # --- chat / 모델 게이트웨이 / Redis -------------------------------------------
 # 비밀값(Redis 비밀번호 포함)은 레포에 넣지 않고 환경변수로 준다.
-REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+# REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 FASTAPI_BASE_URL = os.environ.get('FASTAPI_BASE_URL', 'http://localhost:8000')
 
 MAX_QUESTION_CHARS = 300  # 측정된 제약(CLAUDE.md)
