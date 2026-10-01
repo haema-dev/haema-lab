@@ -1,0 +1,58 @@
+# 워커: API 와 같은 이미지. Redis 큐에서 job 하나씩 꺼내 끝까지 처리한다.
+# 아직 `manage.py run_worker` 가 구현되지 않았으므로 replicas 를 0 으로 둔다.
+# 구현하고 이미지가 올라간 뒤 1 로 바꾼다 (0 이면 파드가 뜨지 않아 크래시 루프가 없다).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloud-backend-worker
+  namespace: default
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: cloud-backend-worker
+  template:
+    metadata:
+      labels:
+        app: cloud-backend-worker
+    spec:
+      # 생성 한 건이 길면 약 2분(README: 긴 RAG 프롬프트 total 111s)이라 종료 시 여유를 준다.
+      terminationGracePeriodSeconds: 120
+      containers:
+      - name: worker
+        image: ghcr.io/haema-dev/cloud-backend:latest
+        command: ["python", "manage.py", "run_worker"]
+        env:
+        - name: DJANGO_SECRET_KEY
+          valueFrom:
+            secretKeyRef: { name: backend-secret, key: DJANGO_SECRET_KEY }
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef: { name: backend-secret, key: DB_NAME }
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef: { name: backend-secret, key: DB_USER }
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef: { name: backend-secret, key: DB_PASSWORD }
+        - name: DB_HOST
+          valueFrom:
+            secretKeyRef: { name: backend-secret, key: DB_HOST }
+        - name: DB_PORT
+          valueFrom:
+            secretKeyRef: { name: backend-secret, key: DB_PORT }
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef: { name: backend-secret, key: REDIS_URL }
+        - name: DJANGO_DEBUG
+          value: "0"
+        - name: FASTAPI_BASE_URL
+          value: "http://cloud-ai-svc.default.svc.cluster.local"
+        resources:
+          # 추정, 미측정
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+          requests:
+            cpu: "100m"
+            memory: "192Mi"
