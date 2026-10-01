@@ -1,0 +1,20 @@
+# Dependencies for apps/backend (Django API + worker). Separate from the root requirements.txt.
+# Install: python -m pip install -r requirements.txt
+# After it works, pin exact versions with `pip freeze` for reproducible builds.
+# Keep this file ASCII only: pip on Korean Windows reads it as cp949.
+
+django>=5.2,<6
+# `import environ`. The package name is django-environ (`pip install environ` is a different package).
+django-environ>=0.11
+# PostgreSQL driver
+psycopg[binary]>=3.2
+# `from pgvector.django import VectorField`
+pgvector>=0.4
+# Job queue (LPUSH/BRPOP) and GPU semaphore
+redis>=5
+# FastAPI model gateway client
+httpx>=0.28
+
+# Used only in the deployment image (Linux). It installs on Windows but does not run there;
+# use `manage.py runserver` locally.
+gunicorn>=23
