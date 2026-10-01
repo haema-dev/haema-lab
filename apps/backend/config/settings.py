@@ -25,9 +25,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# 기본은 꺼짐. 로컬에서만 .env 에 DJANGO_DEBUG=1 을 둔다. (배포 Deployment 는 "0")
+DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 
-ALLOWED_HOSTS = []
+# 쉼표로 구분. Gateway/Service 로 오는 요청의 Host 는 서비스 DNS 이고,
+# 노드 IP 로 직접 접속하는 테스트(NodePort)에서는 그 IP 도 넣어야 한다. 포트는 적지 않는다.
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost").split(",") if h.strip()]
 
 
 # Application definition
@@ -134,7 +137,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # --- chat / 모델 게이트웨이 / Redis -------------------------------------------
 # 비밀값(Redis 비밀번호 포함)은 레포에 넣지 않고 환경변수로 준다.
-# REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+# redis_queue.get_redis() 가 settings.REDIS_URL 을 읽으므로 이 줄이 없으면 메시지 POST 가 AttributeError(500)다.
+# 파드 안에서 기본값(localhost)은 아무도 듣지 않는 주소라 연결 실패(RedisError → 503)가 난다.
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+# 파드 안에서 기본값(localhost:8000)은 Django 자기 자신이다. FastAPI 를 붙일 때는 Deployment 에서 cloud-ai-svc 주소로 덮어쓴다.
 FASTAPI_BASE_URL = os.environ.get('FASTAPI_BASE_URL', 'http://localhost:8000')
 
 MAX_QUESTION_CHARS = 300  # 측정된 제약(CLAUDE.md)

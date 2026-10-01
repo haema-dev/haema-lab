@@ -4,9 +4,10 @@ metadata:
   name: cloud-backend-svc
   namespace: default
 spec:
-  type: ClusterIP # 외부 노출 금지 (Gateway만 접근 가능). X-User-Id 헤더를 믿는 API 라서 NodePort 로 열면 위조된다.
+  type: NodePort          # 테스트용. 끝나면 ClusterIP 로 되돌린다
   selector:
     app: cloud-backend
   ports:
-    - port: 80 # Gateway 가 찌를 포트 (Service 입구)
-      targetPort: 8000 # gunicorn 컨테이너의 실제 포트 (Service 출구)
+    - port: 80
+      targetPort: 8000
+      nodePort: 30081
