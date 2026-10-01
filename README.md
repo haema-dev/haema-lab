@@ -134,20 +134,20 @@ repo/
   │             ├── deploy-gateway.yml
   │             ├── deploy-frontend.yml
   │             ├── deploy-backend.yml       # (planned)
-  │             └── deploy-models.yml        # (planned)
+  │             └── deploy-ai.yml            # (planned)
   │
   ├── apps/
   │     ├── gateway/    # Kotlin + Spring
   │     ├── frontend/   # Typescript + React
   │     ├── backend/    # Python + Django (API + worker)   (planned)
-  │     └── models/     # Python + FastAPI (model gateway) (planned)
+  │     └── ai/         # Python + FastAPI (model gateway) (planned)
   │
   ├── argocd/
   │     ├── gateway.yaml
   │     ├── frontend.yaml
   │     ├── redis.yaml        # (planned)
   │     ├── backend.yaml      # (planned)
-  │     ├── models.yaml       # (planned)
+  │     ├── ai.yaml           # (planned)
   │     └── root-app.yaml
   │
   ├── manifests/
@@ -155,7 +155,7 @@ repo/
   │     ├── frontend/         # Typescript + React
   │     ├── redis/            # StatefulSet + AOF   (planned)
   │     ├── backend/          # Python + Django     (planned)
-  │     └── models/           # Python + FastAPI    (planned)
+  │     └── ai/               # Python + FastAPI    (planned)
   │
   ├── docs/adr/               # Design decision records (planned)
   └── README.md
