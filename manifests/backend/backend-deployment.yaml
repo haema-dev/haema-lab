@@ -16,7 +16,7 @@ spec:
       containers:
       - name: backend
         # 이 줄은 deploy-backend.yml 이 sed 로 자동 갱신한다. 최초 값은 첫 빌드 전 자리표시자.
-        image: ghcr.io/haema-dev/cloud-backend:latest
+        image: ghcr.io/haema-dev/cloud-backend:b553d5a5ea322d9a53ba4f2f22c74d237d19f6f6
         ports:
         - containerPort: 8000
         env:
