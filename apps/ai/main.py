@@ -1,30 +1,8 @@
 # 실행 명령어
 # uv run uvicorn main:app --reload
+#
+# 앱 본체는 src/main.py에 있다.
 
-from fastapi import FastAPI
+from src.main import app
 
-app = FastAPI(
-    title="Haema Model Gateway",
-    description="Stateless model gateway for embedding, generation, and verification.",
-    version="0.1.0",
-)
-
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
-
-
-@app.post("/embed")
-def embed():
-    pass
-
-
-@app.post("/generate")
-def generate():
-    pass
-
-
-@app.post("/judge")
-def judge():
-    pass
+__all__ = ["app"]
