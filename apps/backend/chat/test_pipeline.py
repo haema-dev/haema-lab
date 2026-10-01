@@ -7,7 +7,6 @@ from chat.fastapi_client import FastAPIError, InfraError
 from chat.models import AnswerCache, Message
 from chat.pipeline import process_message
 from chat.redis_queue import GpuBusyError
-from chat.verify import REFUSAL_TEXT
 
 
 @override_settings(FASTAPI_INFRA_RETRY_DELAYS=())  # 재시도 대기(5, 10, 20초)를 없애 테스트를 빠르게
@@ -100,14 +99,15 @@ class PipelineTests(ChatTestCase):
         self.assertIn("unsupported_fact", message.verification["reasons"])
         self.assertEqual(AnswerCache.objects.count(), 0)
 
-    def test_no_chunks_answers_with_refusal_without_generation(self):
+    def test_no_chunks_still_generates_and_saves_without_caching(self):
         self.chunk.delete()
         self.far.delete()
-        client = FakeClient(answer="should not be used")
+        client = FakeClient(answer="LLM 답변")
         status, message = self.run_message(client)
-        self.assertEqual((status, message.answer), ("done", REFUSAL_TEXT))
+        self.assertEqual((status, message.answer, message.source), ("done", "LLM 답변", Message.Source.GENERATED))
         self.assertTrue(message.verification["no_evidence"])
-        self.assertEqual(client.prompts, [])
+        self.assertEqual(message.cited_chunk_ids, [])
+        self.assertEqual(client.prompts, ["2026년 8월 기준금리는?"])
         self.assertEqual(AnswerCache.objects.count(), 0)
 
     def test_infrastructure_failure_goes_back_to_pending_and_is_requeued(self):

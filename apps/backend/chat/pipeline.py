@@ -24,7 +24,7 @@ from chat.retrieval import (
     fit_context,
     search_chunks,
 )
-from chat.verify import REFUSAL_TEXT, check_answer
+from chat.verify import check_answer
 
 log = logging.getLogger(__name__)
 T = TypeVar("T")
@@ -104,12 +104,14 @@ def _run(message: Message, question: str, client: FastAPIClient) -> str:
         search_chunks(vector, min_similarity=getattr(settings, "RAG_MIN_SIMILARITY", None))
     )
     if not documents:
-        # 근거가 없으면 GPU 를 쓰지 않고 거절 문구로 답한다. 캐시하지 않는다.
+        # 근거가 없어도 /generate 로 답을 받아 저장한다(/fallback 은 Gemini 연결 전이라 쓰지 않는다).
+        # 인용할 문서가 없으므로 코드 검증은 건너뛰고, 근거 없는 답이라 answer_cache 에는 넣지 않는다.
         # source 는 table.sql 의 CHECK(cache/generated/fallback) 때문에 generated 로 두고 verification 에 표시한다.
+        answer = with_infra_retry(_with_slot(lambda: client.generate(question)))
         return _close(
             message,
             Message.Status.DONE,
-            answer=REFUSAL_TEXT,
+            answer=answer,
             source=Message.Source.GENERATED,
             cited=[],
             verification={"passed": True, "no_evidence": True},
