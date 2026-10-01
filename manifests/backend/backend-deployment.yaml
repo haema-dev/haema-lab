@@ -46,7 +46,7 @@ spec:
           value: "0"
         # Gateway 는 대상 서비스 DNS 를 Host 로 넘긴다. localhost 는 아래 프로브용.
         - name: DJANGO_ALLOWED_HOSTS
-          value: "cloud-backend-svc,cloud-backend-svc.default.svc.cluster.local,localhost"
+          value: "cloud-backend-svc,cloud-backend-svc.default.svc.cluster.local,localhost,192.168.45.24" # 테스트용으로 내부 아이피 열어둠. 추후에 삭제.
         # 모델 게이트웨이(apps/ai). 클러스터 안 주소만 쓴다.
         # - name: FASTAPI_BASE_URL
         #   value: "http://cloud-ai-svc.default.svc.cluster.local"
