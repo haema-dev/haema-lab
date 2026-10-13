@@ -1,0 +1,21 @@
+# Backend
+fastapi
+uvicorn[standard]
+httpx
+requests
+
+# Web Scraping & Automation
+playwright
+beautifulsoup4
+
+# Vector DB & RAG Framework
+chromadb
+langchain
+langchain-community
+
+# Embedding & LLM Integration
+pymupdf
+psycopg2
+pydantic
+sentence-transformers
+ollama  # 로컬 모델(Qwen, EXAONE) 통신용

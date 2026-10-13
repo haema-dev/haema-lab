@@ -1,7 +1,6 @@
 # haema's Home Lab
 
-A verified RAG Q&A service over official economic data, built on two fixed home-lab nodes.
-Every number in an answer is checked against its cited source before it is shown.
+A verified RAG Q&A service over official economic data, built on two fixed home-lab nodes. Every number in an answer is checked against its cited source. Today the check result is streamed right after the answer; with the job queue, only answers that pass are shown.
 
 ## 🏛️ System Architecture
 
