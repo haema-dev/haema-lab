@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloud-redis-svc
+  namespace: default
+spec:
+  type: ClusterIP # 외부 노출 금지 (Gateway에 연결하지 않음, 클러스터 내부 Django API/워커만 접근)
+  selector:
+    app: cloud-redis
+  ports:
+    - port: 6379 # Django 가 찌를 포트 (redis://cloud-redis-svc.default.svc.cluster.local:6379)
+      targetPort: 6379 # Redis 컨테이너의 실제 포트
