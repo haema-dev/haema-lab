@@ -4,7 +4,7 @@ A verified RAG Q&A service over official economic data, built on two fixed home-
 
 ## 🏛️ System Architecture
 
-![System Architecture Diagram](./system_architecture5.png)
+![System Architecture Diagram](./system_architecture6.png)
 
 > The diagram predates the redesign. See [Request Flow](#-request-flow) for the current design.
 
