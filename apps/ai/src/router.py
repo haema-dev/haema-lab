@@ -39,8 +39,9 @@ async def embed(body: EmbedRequest, client: OllamaClient = Depends(get_ollama)):
 
 @router.post("/generate")
 async def generate(body: GenerateRequest, client: OllamaClient = Depends(get_ollama)):
-    """비스트리밍: 전체 응답을 JSON 하나로 돌려준다."""
-    return {"text": await client.generate(body.prompt)}
+    """비스트리밍: 전체 응답을 JSON 하나로 돌려준다. truncated 는 Django 의 완결성 검사가 쓴다."""
+    text, truncated = await client.generate(body.prompt)
+    return {"text": text, "truncated": truncated}
 
 
 @router.post("/generate/stream")

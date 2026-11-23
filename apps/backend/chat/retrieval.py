@@ -10,7 +10,7 @@ from django.conf import settings
 from pgvector.django import CosineDistance
 
 from chat.models import AnswerCache, SourceChunk
-from chat.verify import Document
+from core.verify import Document
 
 DEFAULT_TOP_K = 4
 DEFAULT_CONTEXT_MAX_CHARS = 2_000  # CLAUDE.md 측정된 제약: 근거 문맥 2,000자

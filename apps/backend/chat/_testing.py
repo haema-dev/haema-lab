@@ -8,6 +8,7 @@ from django.contrib.auth import get_user_model
 from django.db import connection
 from django.test import TestCase
 
+from chat.fastapi_client import GenerateResult
 from chat.models import Conversation, Message, SourceChunk, SourceDocument
 
 _TABLE_SQL = Path(__file__).resolve().parent.parent / "table.sql"
@@ -53,9 +54,12 @@ def unit_vec(index: int) -> list[float]:
 class FakeClient:
     """FastAPIClient 대역: 호출을 기록하고, 지정하면 실패한다."""
 
-    def __init__(self, *, query_vector=None, answer="", embed_error=None, generate_error=None):
+    def __init__(
+        self, *, query_vector=None, answer="", truncated=False, embed_error=None, generate_error=None
+    ):
         self.query_vector = query_vector if query_vector is not None else unit_vec(0)
         self.answer = answer
+        self.truncated = truncated
         self.embed_error = embed_error
         self.generate_error = generate_error
         self.embed_texts: list[str] = []
@@ -71,7 +75,7 @@ class FakeClient:
         self.prompts.append(prompt)
         if self.generate_error:
             raise self.generate_error
-        return self.answer
+        return GenerateResult(text=self.answer, truncated=self.truncated)
 
     def close(self):
         pass

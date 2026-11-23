@@ -71,4 +71,10 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git commit -m "chore: update frontend image tag to ${{ github.sha }}"
-          git push
+          # 여러 앱을 함께 바꾼 머지는 다른 deploy-*.yml 도 동시에 push 한다. 늦은 쪽이 거절되지 않도록
+          # 최신 브랜치 위로 rebase 한 뒤 push 한다 (각자 다른 manifests/<앱> 파일만 바꿔서 충돌 없음).
+          for i in 1 2 3; do
+            git pull --rebase origin "${{ github.ref_name }}" && git push origin "HEAD:${{ github.ref_name }}" && exit 0
+            sleep 5
+          done
+          exit 1

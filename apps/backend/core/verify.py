@@ -14,7 +14,15 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Protocol
+
+
+@dataclass(frozen=True)
+class Document:
+    """An evidence document: the id the answer cites, and the text facts are checked against."""
+
+    document_id: str
+    text: str
+
 
 # A bracketed ISO date such as [2026-08-27] is a date, not a citation.
 CITATION_PATTERN = re.compile(r"\[(?!20\d{2}-\d{2}-\d{2}\])([A-Za-z0-9_\-]+)\]")
@@ -27,16 +35,6 @@ KOREAN_DATE_PATTERN = re.compile(
 )
 ISO_DATE_PATTERN = re.compile(r"(20\d{2})-(\d{2})-(\d{2})")
 REFUSAL_TEXT = "제공된 자료에서 확인할 수 없습니다"
-
-
-class Document(Protocol):
-    """Any evidence with a citation id and text (qa.repository.Evidence, ...)."""
-
-    @property
-    def document_id(self) -> str: ...
-
-    @property
-    def text(self) -> str: ...
 
 
 _POINT_UNITS = frozenset({"퍼센트포인트", "%포인트", "%p"})

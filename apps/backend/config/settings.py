@@ -150,3 +150,12 @@ FASTAPI_INFRA_RETRY_DELAYS = (5, 10, 20)  # 합 35초: ErrorDeviceLost 복구(�
 GPU_SLOTS = 1  # iGPU 1개. 동시 호출 수는 측정 후 조정(추정)
 GPU_SLOT_TTL_SECONDS = 240  # 가장 긴 GPU 호출(FastAPI 타임아웃)보다 길게
 GPU_WAIT_SECONDS = 120
+
+# 설정이 없으면 파이썬 기본값(WARNING 이상)만 나가서 chat 의 INFO(워커 시작, job 결과 metric=job)가 안 보인다.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {'plain': {'format': '%(asctime)s %(levelname)s %(name)s %(message)s'}},
+    'handlers': {'console': {'class': 'logging.StreamHandler', 'formatter': 'plain'}},
+    'loggers': {'chat': {'handlers': ['console'], 'level': 'INFO', 'propagate': False}},
+}

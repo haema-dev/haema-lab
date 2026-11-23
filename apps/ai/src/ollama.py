@@ -24,6 +24,37 @@ class OllamaStreamError(RuntimeError):
     """스트림 도중 Ollama가 {"error": ...}를 보낸 경우."""
 
 
+def _s(ns: object) -> float:
+    return ns / 1e9 if isinstance(ns, (int, float)) else 0.0
+
+
+def _rate(count: object, ns: object) -> float:
+    seconds = _s(ns)
+    return count / seconds if isinstance(count, (int, float)) and seconds > 0 else 0.0
+
+
+def log_generate_metrics(data: dict, wall_s: float) -> None:
+    """README 의 측정값(생성 tok/s, 프롬프트 처리 tok/s, TTFT, 총 시간)을 요청마다 한 줄로 남긴다.
+
+    값은 Ollama 응답의 *_duration(ns)·*_count 그대로다. prompt_tokens 가 프롬프트 길이보다 훨씬 작으면
+    KV 캐시가 재사용된 것이라 prompt_tok_s 가 비현실적으로 커진다 (README: 10,269 tok/s 사례).
+    집계: kubectl logs deploy/cloud-ai | grep 'metric=generate'
+    """
+    log.info(
+        "metric=generate prompt_tokens=%s prompt_tok_s=%.1f output_tokens=%s output_tok_s=%.2f "
+        "ttft_s=%.2f load_s=%.2f total_s=%.2f wall_s=%.2f done_reason=%s",
+        data.get("prompt_eval_count"),
+        _rate(data.get("prompt_eval_count"), data.get("prompt_eval_duration")),
+        data.get("eval_count"),
+        _rate(data.get("eval_count"), data.get("eval_duration")),
+        _s(data.get("load_duration")) + _s(data.get("prompt_eval_duration")),
+        _s(data.get("load_duration")),
+        _s(data.get("total_duration")),
+        wall_s,
+        data.get("done_reason"),
+    )
+
+
 class OllamaClient:
     def __init__(self, http: httpx.AsyncClient, settings: Settings):
         self._http = http
@@ -46,21 +77,32 @@ class OllamaClient:
         return resp.json()
 
     async def embed(self, inputs: list[str]) -> list[list[float]]:
+        t0 = time.perf_counter()
         data = await self._post(
             "/api/embed",
             {"model": self._s.embed_model, "input": inputs},
             timeout=EMBED_TIMEOUT,
         )
+        # README: 질의 임베딩 약 0.65초. inputs=1 이 질의, 그 이상은 색인 배치다.
+        log.info(
+            "metric=embed inputs=%d total_s=%.2f wall_s=%.2f",
+            len(inputs), _s(data.get("total_duration")), time.perf_counter() - t0,
+        )
         return data["embeddings"]
 
-    async def generate(self, prompt: str) -> str:
-        """비스트리밍: 전체 응답을 한 번에 받는다."""
+    async def generate(self, prompt: str) -> tuple[str, bool]:
+        """비스트리밍: (답, 잘림 여부). num_predict 상한에 걸리면 Ollama 가 done_reason "length" 를 준다.
+
+        잘린 답은 문장 경계에서 끊길 수 있어 글자만으로는 알 수 없으므로 이 값을 그대로 넘긴다.
+        """
+        t0 = time.perf_counter()
         data = await self._post(
             "/api/generate",
             self._generate_payload(prompt, stream=False),
             timeout=GENERATE_TIMEOUT,
         )
-        return data["response"]
+        log_generate_metrics(data, time.perf_counter() - t0)
+        return data["response"], data.get("done_reason") == "length"
 
     async def generate_stream(self, prompt: str) -> AsyncIterator[str]:
         """스트리밍: Ollama NDJSON을 읽어 토큰 조각(str)을 yield 한다."""
