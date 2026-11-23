@@ -43,9 +43,16 @@ jobs:
           git add manifests/backend
 
       # 4. 변경된 태그를 Git에 커밋
+      #    apps/ai 와 apps/backend 를 함께 바꾼 머지는 deploy-ai.yml 도 동시에 master 에 push 한다.
+      #    그대로 push 하면 늦은 쪽이 non-fast-forward 로 거절되므로 최신 브랜치 위로 rebase 한 뒤 push 한다 (수동 실행 시 실행한 브랜치 기준).
+      #    두 워크플로는 서로 다른 파일(manifests/ai, manifests/backend)만 바꿔서 rebase 충돌이 나지 않는다.
       - name: 🚀 Commit and Push
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git commit -m "chore: update backend image tag to ${{ github.sha }}"
-          git push
+          for i in 1 2 3; do
+            git pull --rebase origin "${{ github.ref_name }}" && git push origin "HEAD:${{ github.ref_name }}" && exit 0
+            sleep 5
+          done
+          exit 1

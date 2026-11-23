@@ -54,3 +54,6 @@ Thumbs.db
 
 # ETC
 workflow.md
+.claude/CLAUDE.template.md
+.claude/settings.json
+db/schema.sql
