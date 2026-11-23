@@ -4,9 +4,12 @@ metadata:
   name: cloud-redis-svc
   namespace: default
 spec:
-  type: NodePort          # 테스트용. 끝나면 ClusterIP 로 되돌린다 #ClusterIP # 외부 노출 금지 (Gateway에 연결하지 않음, 클러스터 내부 Django API/워커만 접근)
+  # 테스트용 NodePort. 인증이 없으므로 노드 IP 에 닿는 누구나 접근할 수 있다.
+  # 테스트가 끝나면 ClusterIP 로 되돌리고 nodePort 줄을 지운다 (외부 노출 금지, Gateway에 연결하지 않음).
+  type: NodePort
   selector:
     app: cloud-redis
   ports:
     - port: 6379 # Django 가 찌를 포트 (redis://cloud-redis-svc.default.svc.cluster.local:6379)
       targetPort: 6379 # Redis 컨테이너의 실제 포트
+      nodePort: 30379 # PC 에서 접속: redis-cli -h <노드 IP> -p 30379. 비워두면 30000~32767 중 임의로 잡힌다.
