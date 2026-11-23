@@ -1,8 +1,8 @@
 # FastAPI 모델 게이트웨이 (Ollama 호출만 담당, 상태 없음)
 FROM python:3.11-slim
 
-# uv: 로컬과 같은 도구로 uv.lock 기준 의존성 설치
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# uv: 로컬과 같은 도구로 uv.lock 기준 의존성 설치. 버전 고정: latest 면 uv 가 바뀔 때마다 이 레이어와 아래 의존성 레이어가 다시 만들어진다.
+COPY --from=ghcr.io/astral-sh/uv:0.12.21 /uv /usr/local/bin/uv
 
 WORKDIR /app
 

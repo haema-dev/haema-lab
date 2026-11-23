@@ -4,3 +4,6 @@ __pycache__/
 *.pyc
 table.sql
 .git
+.venv/
+.pytest_cache/
+docs/

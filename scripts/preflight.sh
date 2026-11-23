@@ -18,7 +18,11 @@ else fail "backend-secret REDIS_URL" "Actions 에서 'Inject backend-secret'(sec
 if [ "$(kubectl exec cloud-redis-0 -n "$NS" -- redis-cli ping 2>/dev/null)" = "PONG" ]; then ok "redis PONG"
 else fail "redis PONG" "kubectl get pod cloud-redis-0 -n $NS / kubectl describe pod cloud-redis-0 -n $NS"; fi
 
-# 3. ai 파드에서 Ollama 에 닿고, 설정한 두 모델이 받아져 있는지 (Tailscale 경유)
+# 3. 노드 중계기(scripts/node/ollama-relay.service). ai 파드는 이걸 거쳐 Tailscale 너머 Ollama 에 닿는다.
+if [ "$(systemctl is-active ollama-relay 2>/dev/null)" = "active" ]; then ok "node ollama-relay"
+else fail "node ollama-relay" "scripts/node/ollama-relay.service 의 설치 방법대로 kubes 에 설치"; fi
+
+# 4. ai 파드에서 Ollama 에 닿고, 설정한 두 모델이 받아져 있는지 (노드 중계기 -> Tailscale 경유)
 ai_out=$(kubectl exec deploy/cloud-ai -n "$NS" -- python -c '
 import os, httpx
 names = {m["name"] for m in httpx.get(os.environ["OLLAMA_BASE_URL"].rstrip("/") + "/api/tags", timeout=5).json()["models"]}
@@ -28,7 +32,7 @@ print("missing=" + ",".join(missing) if missing else "ok")
 if [ "$ai_out" = "ok" ]; then ok "ai -> ollama, models present"
 else fail "ai -> ollama, models present" "$ai_out (OLLAMA_BASE_URL 도달·ollama pull 확인)"; fi
 
-# 4. DB: chat 테이블(table.sql), 테스트 유저 1(Gateway 가 고정으로 넣는 id), 임베딩된 근거 청크
+# 5. DB: chat 테이블(table.sql), 테스트 유저 1(Gateway 가 고정으로 넣는 id), 임베딩된 근거 청크
 db_out=$(kubectl exec deploy/cloud-backend -n "$NS" -- python manage.py shell -c '
 from django.db import connection
 from django.contrib.auth import get_user_model
@@ -54,7 +58,7 @@ case "$db_out" in
   *) fail "db indexed chunks" "$db_out" ;;
 esac
 
-# 5. 워커 (master 머지 후에 생긴다)
+# 6. 워커 (master 머지 후에 생긴다)
 if kubectl get deploy cloud-backend-worker -n "$NS" >/dev/null 2>&1; then
   ready=$(kubectl get deploy cloud-backend-worker -n "$NS" -o jsonpath='{.status.readyReplicas}')
   if [ "${ready:-0}" -ge 1 ]; then ok "worker running"; else fail "worker running" "kubectl logs deploy/cloud-backend-worker -n $NS"; fi
