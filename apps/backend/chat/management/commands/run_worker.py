@@ -18,7 +18,7 @@ from datetime import timedelta
 import redis
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from django.db import InterfaceError, OperationalError, close_old_connections, connections
+from django.db import InterfaceError, OperationalError, connections
 from django.utils import timezone
 
 from chat.fastapi_client import FastAPIClient
@@ -56,6 +56,17 @@ def release_for_retry(message_id: int) -> None:
         status=Message.Status.PENDING, updated_at=timezone.now()
     )
     enqueue_message(message_id)
+
+
+def refresh_db_connections() -> None:
+    """job 사이에 쓸 수 없게 된(끊긴·오래된) 연결을 정리한다. django.db.close_old_connections 와 같되,
+
+    트랜잭션(atomic) 안의 연결은 건드리지 않는다. close_old_connections 는 autocommit 이 꺼진 연결을 무조건 닫아서
+    TestCase(테스트마다 atomic) 안에서 워커를 돌리면 테스트 DB 연결이 닫힌다. 운영 워커는 job 사이에 트랜잭션 밖이다.
+    """
+    for conn in connections.all(initialized_only=True):
+        if not conn.in_atomic_block:
+            conn.close_if_unusable_or_obsolete()
 
 
 def drop_db_connections() -> None:
@@ -109,7 +120,7 @@ class Command(BaseCommand):
 
     def _handle_message(self, message_id: int, client: FastAPIClient, *, once: bool) -> None:
         # 오래 도는 프로세스라 요청 경계가 없다: 쓸 수 없게 된 연결은 job 마다 정리한다.
-        close_old_connections()
+        refresh_db_connections()
         log.info("job req message=%s", message_id)
         t0 = time.monotonic()
         try:
@@ -118,8 +129,9 @@ class Command(BaseCommand):
                 logging.INFO if status in ("done", "skipped", "pending") else logging.WARNING,
                 "job res message=%s status=%s dur=%.1fs", message_id, status, time.monotonic() - t0,
             )
-        except DB_ERRORS:
-            log.warning("message %s interrupted by database error, will retry", message_id, exc_info=True)
+        except DB_ERRORS as exc:
+            log.warning("job res message=%s status=db_error dur=%.1fs error=%s: %s (재시도)", message_id,
+                        time.monotonic() - t0, type(exc).__name__, exc)
             drop_db_connections()
             self._with_db_retry(lambda: release_for_retry(message_id), once=once, what=f"release {message_id}")
         except Exception:
@@ -129,9 +141,9 @@ class Command(BaseCommand):
                 Message.objects.filter(
                     pk=message_id, status__in=[Message.Status.PENDING, Message.Status.PROCESSING]
                 ).update(status=Message.Status.FAILED, error="internal_error", updated_at=timezone.now())
-            except DB_ERRORS:
+            except DB_ERRORS as exc:
                 # 닫지 못하면 processing 으로 남고, 다음 시작 때 requeue_stale 이 다시 넣는다.
-                log.warning("could not mark message %s failed: database unavailable", message_id, exc_info=True)
+                log.warning("could not mark message %s failed: %s: %s", message_id, type(exc).__name__, exc)
                 drop_db_connections()
 
     def _with_db_retry(self, call, *, once: bool, what: str):
@@ -140,11 +152,12 @@ class Command(BaseCommand):
         while True:
             try:
                 return call()
-            except DB_ERRORS:
+            except DB_ERRORS as exc:
                 if once or self._stop:
                     raise
                 delay = self._db_delays[min(attempt, len(self._db_delays) - 1)] if self._db_delays else 0
                 attempt += 1
-                log.warning("database unavailable during %s, retry %s in %ss", what, attempt, delay, exc_info=True)
+                log.warning("database unavailable during %s, retry %s in %ss: %s: %s", what, attempt, delay,
+                            type(exc).__name__, exc)
                 drop_db_connections()
                 time.sleep(delay)

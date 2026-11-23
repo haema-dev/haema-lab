@@ -16,7 +16,7 @@ DB_DOWN = OperationalError("server closed the connection unexpectedly")
 @override_settings(WORKER_DB_RETRY_DELAYS=(2, 4))
 class WorkerDbErrorTests(SimpleTestCase):
     def setUp(self):
-        for target in ("close_old_connections", "drop_db_connections"):
+        for target in ("refresh_db_connections", "drop_db_connections"):
             patcher = patch(f"{WORKER}.{target}")
             setattr(self, target, patcher.start())
             self.addCleanup(patcher.stop)
@@ -38,7 +38,7 @@ class WorkerDbErrorTests(SimpleTestCase):
         release.assert_called_once_with(7)
         message_model.objects.filter.assert_not_called()  # FAILED/internal_error 로 닫지 않는다
         self.drop_db_connections.assert_called()
-        self.close_old_connections.assert_called_once()
+        self.refresh_db_connections.assert_called_once()
 
     def test_interface_error_is_treated_as_db_error_too(self):
         with patch(f"{WORKER}.process_message", side_effect=InterfaceError("connection already closed")), \
@@ -123,3 +123,15 @@ class DropConnectionsTests(SimpleTestCase):
             conns.all.return_value = [broken]
             run_worker.drop_db_connections()
         conns.all.assert_called_once_with(initialized_only=True)
+
+
+class RefreshConnectionsTests(SimpleTestCase):
+    """job 사이 연결 정리: 트랜잭션(TestCase 의 atomic) 안의 연결은 닫지 않는다 (CI test_worker 깨짐 재발 방지)."""
+
+    def test_skips_connections_inside_atomic_block(self):
+        in_tx, idle = MagicMock(in_atomic_block=True), MagicMock(in_atomic_block=False)
+        with patch.object(run_worker, "connections") as conns:
+            conns.all.return_value = [in_tx, idle]
+            run_worker.refresh_db_connections()
+        in_tx.close_if_unusable_or_obsolete.assert_not_called()
+        idle.close_if_unusable_or_obsolete.assert_called_once()
