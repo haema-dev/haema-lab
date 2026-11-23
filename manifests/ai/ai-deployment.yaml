@@ -19,7 +19,7 @@ spec:
       containers:
       - name: ai
         # 이 줄은 deploy-ai.yml 이 sed 로 자동 갱신한다. 최초 값은 첫 빌드 전 자리표시자.
-        image: ghcr.io/haema-dev/cloud-ai:a4435e3abca837d630461ddc8d436caf0d8ba995
+        image: ghcr.io/haema-dev/cloud-ai:08c6c483ae49a90c29ab9cd3331276c4eb8bb100
         ports:
         - containerPort: 8000
         env:
