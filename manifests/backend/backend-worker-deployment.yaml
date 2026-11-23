@@ -20,7 +20,7 @@ spec:
       terminationGracePeriodSeconds: 120
       containers:
       - name: worker
-        image: ghcr.io/haema-dev/cloud-backend:0e889c2972610fce63e440060578c5c3816df42b
+        image: ghcr.io/haema-dev/cloud-backend:1e526202fac31960264e2703f31c1f86ba10ad07
         command: ["python", "manage.py", "run_worker"]
         env:
         - name: DJANGO_SECRET_KEY
