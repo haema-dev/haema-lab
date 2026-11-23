@@ -13,6 +13,18 @@ from router import router
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 
+class _SkipHealthAccessLog(logging.Filter):
+    """K8s 프로브가 /health 를 10~30초마다 찔러 access 로그가 묻히므로 그 줄만 뺀다. 실제 요청은 그대로 찍는다."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        # uvicorn.access 의 args: (client_addr, method, path, http_version, status_code)
+        args = record.args
+        return not (isinstance(args, tuple) and len(args) >= 3 and args[2] == "/health")
+
+
+logging.getLogger("uvicorn.access").addFilter(_SkipHealthAccessLog())
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with httpx.AsyncClient() as http:
