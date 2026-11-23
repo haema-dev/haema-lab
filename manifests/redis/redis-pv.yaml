@@ -1,0 +1,21 @@
+# Redis RDB 스냅샷용 정적 PV. 클러스터에 동적 프로비저너(기본 StorageClass)가 없어 직접 만든다.
+# 단일 노드(kubes VM) 클러스터라 hostPath 로 충분하다. 노드를 늘리면 nodeAffinity 를 추가해야 한다.
+# StatefulSet 이 만드는 PVC 이름은 <볼륨템플릿>-<STS>-<순번> = data-cloud-redis-0 이다.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: cloud-redis-pv
+spec:
+  storageClassName: redis-local
+  capacity:
+    storage: 1Gi
+  accessModes: ["ReadWriteOnce"]
+  # PV 가 지워져도 노드의 스냅샷 파일은 남긴다.
+  persistentVolumeReclaimPolicy: Retain
+  # 다른 PVC 가 이 PV 를 가져가지 않도록 Redis PVC 에만 묶는다.
+  claimRef:
+    namespace: default
+    name: data-cloud-redis-0
+  hostPath:
+    path: /var/lib/cloud-redis
+    type: DirectoryOrCreate

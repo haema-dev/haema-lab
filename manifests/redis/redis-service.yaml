@@ -4,7 +4,7 @@ metadata:
   name: cloud-redis-svc
   namespace: default
 spec:
-  type: ClusterIP # 외부 노출 금지 (Gateway에 연결하지 않음, 클러스터 내부 Django API/워커만 접근)
+  type: NodePort          # 테스트용. 끝나면 ClusterIP 로 되돌린다 #ClusterIP # 외부 노출 금지 (Gateway에 연결하지 않음, 클러스터 내부 Django API/워커만 접근)
   selector:
     app: cloud-redis
   ports:
