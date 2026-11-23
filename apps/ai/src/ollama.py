@@ -71,8 +71,13 @@ class OllamaClient:
             "options": {"num_predict": NUM_PREDICT, "num_ctx": NUM_CTX},
         }
 
+    def _timeout(self, read: float) -> httpx.Timeout:
+        # 숫자 하나만 넘기면 connect 에도 같은 값이 걸려, Ollama 에 닿지 않을 때 embed 30초·generate 180초를 기다린다.
+        # 연결은 connect_timeout(기본 5초) 안에 실패시키고, 느린 생성은 read 로만 기다린다.
+        return httpx.Timeout(read, connect=self._s.connect_timeout)
+
     async def _post(self, path: str, payload: dict, timeout: float) -> dict:
-        resp = await self._http.post(f"{self._base}{path}", json=payload, timeout=timeout)
+        resp = await self._http.post(f"{self._base}{path}", json=payload, timeout=self._timeout(timeout))
         resp.raise_for_status()
         return resp.json()
 
@@ -130,7 +135,7 @@ class OllamaClient:
             "POST",
             f"{self._base}/api/generate",
             json=self._generate_payload(prompt, stream=True),
-            timeout=GENERATE_TIMEOUT,
+            timeout=self._timeout(GENERATE_TIMEOUT),
         ) as resp:
             if resp.status_code >= 400:
                 await resp.aread()  # 스트림 응답은 본문을 읽어야 에러 내용을 볼 수 있다

@@ -9,7 +9,7 @@ from chat.pipeline import process_message
 from chat.redis_queue import GpuBusyError
 
 
-@override_settings(FASTAPI_INFRA_RETRY_DELAYS=())  # 재시도 대기(5, 10, 20초)를 없애 테스트를 빠르게
+@override_settings(FASTAPI_INFRA_RETRY_DELAYS=())  # 재시도 대기(settings.FASTAPI_INFRA_RETRY_DELAYS)를 없애 테스트를 빠르게
 class PipelineTests(ChatTestCase):
     def setUp(self):
         patcher = patch("chat.pipeline.gpu_slot", no_gpu_slot)

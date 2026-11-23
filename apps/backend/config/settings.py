@@ -46,6 +46,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'chat.middleware.RequestLogMiddleware',  # 맨 앞: 다른 미들웨어의 거절(400 등)과 걸린 시간까지 찍는다
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -146,7 +147,11 @@ FASTAPI_BASE_URL = os.environ.get('FASTAPI_BASE_URL', 'http://localhost:8000')
 MAX_QUESTION_CHARS = 300  # 측정된 제약(CLAUDE.md)
 # 생성 타임아웃은 FastAPI 쪽 180초(ai 브랜치 config.py)보다 길게.
 FASTAPI_TIMEOUT_SECONDS = 200.0
-FASTAPI_INFRA_RETRY_DELAYS = (5, 10, 20)  # 합 35초: ErrorDeviceLost 복구(약 15초)를 넘긴다
+# 5xx·429·연결 끊김 재시도 대기. 합 17초: ErrorDeviceLost 복구(약 15초)는 넘기되, 모델 서버에 아예 닿지 않을 때
+# 실패 확정이 길어지지 않게 줄였다 (이전 (5, 10, 20) + 3회 job 재시도: 실측 469초 걸려 실패 확정).
+FASTAPI_INFRA_RETRY_DELAYS = (5, 12)
+# 인프라 실패 시 job 전체를 다시 큐에 넣는 횟수(첫 시도 포함).
+JOB_MAX_ATTEMPTS = 2
 GPU_SLOTS = 1  # iGPU 1개. 동시 호출 수는 측정 후 조정(추정)
 GPU_SLOT_TTL_SECONDS = 240  # 가장 긴 GPU 호출(FastAPI 타임아웃)보다 길게
 GPU_WAIT_SECONDS = 120

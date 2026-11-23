@@ -111,19 +111,78 @@ def test_embed_logs_input_count_and_time(client, caplog):
     assert any("metric=embed inputs=1 total_s=0.65" in r.getMessage() for r in caplog.records)
 
 
-def test_ollama_server_error_becomes_503(client):
+def test_ollama_server_error_becomes_502_with_its_status(client):
     client.ollama.post("/api/generate").respond(status_code=500)
 
     resp = client.post("/generate", json={"prompt": "질문"})
 
-    assert resp.status_code == 503
+    assert resp.status_code == 502
     assert resp.json()["detail"].startswith("ollama:")
+    assert resp.json()["code"] == "ollama_http_500"
 
 
 def test_ollama_connection_error_becomes_503(client):
     client.ollama.post("/api/embed").mock(side_effect=httpx.ConnectError("refused"))
 
-    assert client.post("/embed", json={"inputs": ["a"]}).status_code == 503
+    resp = client.post("/embed", json={"inputs": ["a"]})
+
+    assert (resp.status_code, resp.json()["code"]) == (503, "ollama_unreachable")
+
+
+@pytest.mark.parametrize(
+    ("error", "status", "code"),
+    [
+        (httpx.ConnectTimeout("no route"), 503, "ollama_unreachable"),
+        (httpx.ReadTimeout("slow"), 504, "ollama_timeout"),
+        (httpx.RemoteProtocolError("closed mid-response"), 502, "ollama_disconnected"),
+        (httpx.ReadError("reset"), 502, "ollama_disconnected"),
+    ],
+)
+def test_ollama_failures_are_split_by_kind(client, error, status, code):
+    client.ollama.post("/api/embed").mock(side_effect=error)
+
+    resp = client.post("/embed", json={"inputs": ["a"]})
+
+    assert (resp.status_code, resp.json()["code"]) == (status, code)
+
+
+def test_missing_model_is_reported_as_ollama_404(client):
+    client.ollama.post("/api/embed").respond(status_code=404, json={"error": "model not found"})
+
+    resp = client.post("/embed", json={"inputs": ["a"]})
+
+    assert (resp.status_code, resp.json()["code"]) == (502, "ollama_http_404")
+
+
+def test_request_and_result_are_logged_once_each(client, caplog):
+    client.ollama.post("/api/embed").respond(json={"embeddings": [[0.1]]})
+
+    with caplog.at_level(logging.INFO, logger="access"):
+        client.post("/embed", json={"inputs": ["a"]}, headers={"X-Request-Id": "abc123"})
+        client.get("/health")
+
+    lines = [r.getMessage() for r in caplog.records if r.name == "access"]
+    assert len(lines) == 2  # /health 는 찍지 않는다
+    assert lines[0] == "req id=abc123 POST /embed"
+    assert lines[1].startswith("res id=abc123 POST /embed status=200 code=ok dur=")
+
+
+def test_failed_result_is_logged_as_warning_with_code(client, caplog):
+    client.ollama.post("/api/embed").mock(side_effect=httpx.ConnectTimeout("no route"))
+
+    with caplog.at_level(logging.INFO, logger="access"):
+        client.post("/embed", json={"inputs": ["a"]})
+
+    result = [r for r in caplog.records if r.name == "access"][-1]
+    assert result.levelno == logging.WARNING
+    assert "status=503 code=ollama_unreachable" in result.getMessage()
+
+
+def test_validation_error_is_logged_with_http_code(client, caplog):
+    with caplog.at_level(logging.INFO, logger="access"):
+        client.post("/embed", json={"inputs": []})
+
+    assert "status=422 code=http_422" in [r for r in caplog.records if r.name == "access"][-1].getMessage()
 
 
 def test_health_probe_is_not_access_logged(caplog):
