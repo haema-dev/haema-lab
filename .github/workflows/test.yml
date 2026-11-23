@@ -1,23 +1,55 @@
 name: "Test"
 
-# 머지 전에 세 앱의 테스트를 돌린다. 배포(deploy-*.yml)는 하지 않고, 레포에 커밋도 하지 않는다.
+# 머지 전 테스트. 배포(deploy-*.yml)는 하지 않고, 레포에 커밋도 하지 않는다.
 # 외부 의존(Ollama, Gemini, Redis, 실제 모델)은 모두 mock 이다.
 # backend 의 DB 테스트만 실제 PostgreSQL + pgvector 컨테이너를 쓴다 (chat_* 테이블이 pgvector 타입이라 mock 불가).
+#
+# 구조: changes 가 PR 에서 바뀐 앱을 찾고, 바뀐 앱의 테스트 job 만 돈다. 나머지는 skipped.
+#   - 워크플로 자체는 모든 PR 에서 돈다(paths 필터를 워크플로에 걸면 안 뜬 체크가 필수 체크를 영원히 막는다).
+#   - 브랜치 보호의 필수 체크는 마지막 "test-result" 하나만 걸면 된다. 앱이 늘어도 필수 체크를 고칠 필요가 없다.
+#   - 이 파일이 바뀌면 세 앱 모두 돈다. workflow_dispatch(수동 실행)도 모두 돈다.
 on:
   workflow_dispatch:
   pull_request:
     branches: [ master ]
-    paths:
-      - 'apps/ai/**'
-      - 'apps/backend/**'
-      - 'apps/gateway/**'
-      - '.github/workflows/test.yml'
 
 permissions:
   contents: read
+  pull-requests: read  # paths-filter 가 PR 의 변경 파일 목록을 API 로 읽는다
+
+# 같은 PR 에 새 커밋이 오면 이전 실행은 취소한다.
+concurrency:
+  group: test-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      ai: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.ai == 'true' }}
+      backend: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.backend == 'true' }}
+      gateway: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.gateway == 'true' }}
+    steps:
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            workflow: &workflow
+              - '.github/workflows/test.yml'
+            ai:
+              - 'apps/ai/**'
+              - *workflow
+            backend:
+              - 'apps/backend/**'
+              - *workflow
+            gateway:
+              - 'apps/gateway/**'
+              - *workflow
+
   ai:
+    needs: changes
+    if: needs.changes.outputs.ai == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -32,6 +64,8 @@ jobs:
         run: uv run --no-sync pytest -q
 
   backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -69,6 +103,8 @@ jobs:
         run: python manage.py test -v 2
 
   gateway:
+    needs: changes
+    if: needs.changes.outputs.gateway == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -82,3 +118,17 @@ jobs:
         run: |
           chmod +x apps/gateway/gradlew
           ./apps/gateway/gradlew -p apps/gateway test
+
+  # 필수 체크로 거는 job. 하나라도 failure/cancelled 면 실패, 바뀌지 않아 skipped 인 것은 통과로 본다.
+  test-result:
+    if: always()
+    needs: [changes, ai, backend, gateway]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summarize
+        run: |
+          echo "changes=${{ needs.changes.result }} ai=${{ needs.ai.result }} backend=${{ needs.backend.result }} gateway=${{ needs.gateway.result }}"
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "::error::실패하거나 취소된 테스트가 있습니다."
+            exit 1
+          fi

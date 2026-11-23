@@ -121,3 +121,66 @@ class InfraRetryTests(SimpleTestCase):
         with self.assertRaises(FastAPIError):
             with_infra_retry(rejected, sleep=slept.append)
         self.assertEqual(slept, [])
+
+
+class ErrorCodeTests(SimpleTestCase):
+    """에러 코드: ai 까지 못 간 것(ai_*), ai 가 알려준 것(body 의 code), 그 밖(http_<상태>)을 나눈다."""
+
+    def error_for(self, response_or_error):
+        client, _ = client_returning(response_or_error)
+        with self.assertRaises(FastAPIError) as ctx:
+            client.embed(["a"])
+        return ctx.exception
+
+    def test_transport_failures_to_ai_are_split(self):
+        cases = [
+            (httpx.ConnectTimeout("t"), "ai_connect_timeout"),
+            (httpx.ConnectError("refused"), "ai_connect_error"),
+            (httpx.ReadTimeout("slow"), "ai_timeout"),
+            (httpx.RemoteProtocolError("closed"), "ai_disconnected"),
+        ]
+        for error, code in cases:
+            with self.subTest(code=code):
+                exc = self.error_for(error)
+                self.assertIsInstance(exc, InfraError)
+                self.assertEqual((exc.code, exc.status), (code, None))
+
+    def test_ai_reported_code_is_kept_with_status(self):
+        for status, code in ((503, "ollama_unreachable"), (504, "ollama_timeout"), (502, "ollama_http_404")):
+            with self.subTest(code=code):
+                exc = self.error_for(httpx.Response(status, json={"detail": "ollama: x", "code": code}))
+                self.assertIsInstance(exc, InfraError)
+                self.assertEqual((exc.code, exc.status), (code, status))
+                self.assertIn(f"{code} (HTTP {status})", str(exc))
+
+    def test_without_body_code_falls_back_to_http_status(self):
+        exc = self.error_for(httpx.Response(500, text="Internal Server Error"))
+        self.assertEqual((exc.code, exc.status), ("http_500", 500))
+        exc = self.error_for(httpx.Response(429, json={"detail": "busy"}))
+        self.assertEqual(exc.code, "http_429")
+
+    def test_client_error_and_bad_response_codes(self):
+        exc = self.error_for(httpx.Response(422, json={"detail": "bad"}))
+        self.assertNotIsInstance(exc, InfraError)
+        self.assertEqual((exc.code, exc.status), ("http_422", 422))
+        self.assertEqual(self.error_for(httpx.Response(200, text="<html>")).code, "bad_response")
+        self.assertEqual(self.error_for(httpx.Response(200, json={"embeddings": []})).code, "bad_response")
+
+
+class CallLogTests(SimpleTestCase):
+    def test_request_and_result_lines_share_an_id_sent_to_ai(self):
+        vector = [0.0] * EMBEDDING_DIMENSIONS
+        client, seen = client_returning(httpx.Response(200, json={"embeddings": [vector]}))
+        with self.assertLogs("chat.fastapi_client", level="INFO") as logs:
+            client.embed(["a"])
+        rid = seen[0].headers["X-Request-Id"]
+        self.assertEqual(len(logs.output), 2)
+        self.assertIn(f"fastapi req id={rid} POST /embed", logs.output[0])
+        self.assertIn(f"fastapi res id={rid} POST /embed status=200 code=ok", logs.output[1])
+
+    def test_failure_result_is_warning_with_code(self):
+        client, _ = client_returning(httpx.Response(503, json={"detail": "x", "code": "ollama_unreachable"}))
+        with self.assertLogs("chat.fastapi_client", level="INFO") as logs, self.assertRaises(InfraError):
+            client.embed(["a"])
+        self.assertTrue(logs.output[-1].startswith("WARNING"))
+        self.assertIn("status=503 code=ollama_unreachable", logs.output[-1])
