@@ -1,14 +1,15 @@
-"""FastAPI 모델 게이트웨이 클라이언트. 계약은 ai 브랜치 apps/ai/src/router.py 기준.
+"""FastAPI 모델 게이트웨이 클라이언트. 계약 원본은 apps/ai/src/router.py (apps/ai/tests/test_api.py 가 고정).
 
     POST /embed     {"inputs": [str, ...]}  -> {"embeddings": [[float, ...], ...]}
-    POST /generate  {"prompt": str}         -> {"text": str}
+    POST /generate  {"prompt": str}         -> {"text": str, "truncated": bool}
 
-/judge, /fallback은 ai 브랜치 router.py에 아직 없다(CLAUDE.md에는 계획만 있음). 생기면 여기에 추가한다.
-5xx·연결 끊김은 InfraError(재시도 대상, 유저 실패 카운터에 넣지 않음), 그 외 4xx는 FastAPIError.
+/judge, /fallback은 ai 쪽에 아직 없다(CLAUDE.md에는 계획만 있음). 생기면 여기에 추가한다.
+5xx·429·연결 끊김은 InfraError(재시도 대상, 유저 실패 카운터에 넣지 않음), 그 외 4xx와 계약에 안 맞는 응답은 FastAPIError.
 """
 
 import time
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from typing import Any, TypeVar
 
 import httpx
@@ -27,11 +28,24 @@ class InfraError(FastAPIError):
     """모델 서버 5xx, 연결 끊김, ErrorDeviceLost, 429. 재시도한다."""
 
 
+@dataclass(frozen=True)
+class GenerateResult:
+    text: str
+    truncated: bool  # num_predict 상한에 걸려 잘림. 완결성 검사(core.verify.check_generation)가 쓴다.
+
+
 class FastAPIClient:
-    def __init__(self, base_url: str | None = None, *, timeout: float | None = None) -> None:
+    def __init__(
+        self,
+        base_url: str | None = None,
+        *,
+        timeout: float | None = None,
+        transport: httpx.BaseTransport | None = None,  # 테스트에서 httpx.MockTransport 를 넣는다
+    ) -> None:
         self._http = httpx.Client(
             base_url=base_url or settings.FASTAPI_BASE_URL,
             timeout=timeout or settings.FASTAPI_TIMEOUT_SECONDS,
+            transport=transport,
         )
 
     def close(self) -> None:
@@ -62,11 +76,16 @@ class FastAPIClient:
             raise FastAPIError(f"/embed: {EMBEDDING_DIMENSIONS}차원이 아니다(다른 임베딩 모델?)")
         return vectors
 
-    def generate(self, prompt: str) -> str:
-        text = self._post("/generate", {"prompt": prompt}).get("text")
+    def generate(self, prompt: str) -> GenerateResult:
+        data = self._post("/generate", {"prompt": prompt})
+        text, truncated = data.get("text"), data.get("truncated")
         if not isinstance(text, str):
             raise FastAPIError("/generate: text 없음")
-        return text
+        # 없으면 잘림을 알 수 없다. False 로 가정하면 잘린 답이 완결성 검사를 통과하므로 쓰지 않는다.
+        # 배포 중 구버전 게이트웨이가 잠깐 응답하는 경우라 인프라 실패로 보고 재시도한다 (배포 순서 무관).
+        if not isinstance(truncated, bool):
+            raise InfraError("/generate: truncated 없음(구버전 게이트웨이?)")
+        return GenerateResult(text=text, truncated=truncated)
 
 
 def with_infra_retry(call: Callable[[], T], *, delays: Sequence[float] | None = None, sleep=time.sleep) -> T:

@@ -99,15 +99,24 @@ class PipelineTests(ChatTestCase):
         self.assertIn("unsupported_fact", message.verification["reasons"])
         self.assertEqual(AnswerCache.objects.count(), 0)
 
-    def test_no_chunks_still_generates_and_saves_without_caching(self):
+    def test_truncated_answer_is_rejected_even_if_facts_match(self):
+        client = FakeClient(answer=self.good, truncated=True)
+        status, message = self.run_message(client)
+        self.assertEqual((status, message.error), ("rejected", "verification_failed"))
+        self.assertIsNone(message.answer)
+        self.assertEqual(message.verification["reasons"], ["truncated"])
+        self.assertEqual(AnswerCache.objects.count(), 0)
+
+    def test_no_chunks_fails_without_calling_the_model(self):
         self.chunk.delete()
         self.far.delete()
-        client = FakeClient(answer="LLM 답변")
+        client = FakeClient(answer="근거 없는 답")
         status, message = self.run_message(client)
-        self.assertEqual((status, message.answer, message.source), ("done", "LLM 답변", Message.Source.GENERATED))
-        self.assertTrue(message.verification["no_evidence"])
-        self.assertEqual(message.cited_chunk_ids, [])
-        self.assertEqual(client.prompts, ["2026년 8월 기준금리는?"])
+        self.assertEqual((status, message.status, message.error), ("failed", Message.Status.FAILED, "no_evidence"))
+        self.assertIsNone(message.answer)
+        self.assertEqual(message.retry_count, 0)  # 재시도해도 같은 결과라 큐에 다시 넣지 않는다
+        self.assertEqual(client.prompts, [])
+        self.enqueued.assert_not_called()
         self.assertEqual(AnswerCache.objects.count(), 0)
 
     def test_infrastructure_failure_goes_back_to_pending_and_is_requeued(self):

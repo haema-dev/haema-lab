@@ -1,0 +1,84 @@
+name: "Test"
+
+# 머지 전에 세 앱의 테스트를 돌린다. 배포(deploy-*.yml)는 하지 않고, 레포에 커밋도 하지 않는다.
+# 외부 의존(Ollama, Gemini, Redis, 실제 모델)은 모두 mock 이다.
+# backend 의 DB 테스트만 실제 PostgreSQL + pgvector 컨테이너를 쓴다 (chat_* 테이블이 pgvector 타입이라 mock 불가).
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'apps/ai/**'
+      - 'apps/backend/**'
+      - 'apps/gateway/**'
+      - '.github/workflows/test.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ai:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/ai
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      # Dockerfile 과 같은 이유로 --no-install-project (src/ 가 패키지 구조가 아님). dev 그룹(pytest, respx)은 포함.
+      - name: Install
+        run: uv sync --frozen --no-install-project
+      - name: Pytest (Ollama 는 respx mock)
+        run: uv run --no-sync pytest -q
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backend
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # 테스트 전용 값. Django 가 test_postgres DB 를 만들고 끝나면 지운다.
+      DJANGO_SECRET_KEY: test-only
+      DB_NAME: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_HOST: localhost
+      DB_PORT: "5432"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"  # Dockerfile 과 같은 버전
+          cache: pip
+          cache-dependency-path: apps/backend/requirements.txt
+      - name: Install
+        run: pip install -r requirements.txt
+      # core(검증), chat(파이프라인·워커·클라이언트). FastAPI·Redis 는 patch/MockTransport.
+      - name: Django tests
+        run: python manage.py test -v 2
+
+  gateway:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+      # 라우팅 테스트는 mock 요청만 쓴다 (프론트·백엔드로 실제 요청을 보내지 않음).
+      - name: Gradle test
+        run: |
+          chmod +x apps/gateway/gradlew
+          ./apps/gateway/gradlew -p apps/gateway test

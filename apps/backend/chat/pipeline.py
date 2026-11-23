@@ -1,8 +1,9 @@
 """메시지 하나를 끝까지 처리한다: 캐시 -> 질문 임베딩 -> 검색 -> 생성 -> 코드 검증 -> 저장.
 
 GPU 를 쓰는 호출(/embed, /generate)만 Redis 세마포어로 감싼다. 인프라 실패(모델 서버 5xx,
-연결 끊김, GPU 슬롯 대기 초과)는 유저 실패가 아니므로 재시도(retry_count)하고, 코드 검증에
-실패한 답은 저장하지 않고 rejected 로 닫는다.
+연결 끊김, GPU 슬롯 대기 초과)는 유저 실패가 아니므로 재시도(retry_count)하고, 코드 검증
+(core.verify: 수치·인용·잘림)에 실패한 답은 저장하지 않고 rejected 로 닫는다.
+근거 문서가 하나도 없으면 생성하지 않는다: 검증할 근거가 없는 답은 보여주지 않는다.
 
 Gemini 판정(/judge)과 /fallback 은 ai 쪽에 아직 없어서 여기에도 없다.
 """
@@ -24,7 +25,7 @@ from chat.retrieval import (
     fit_context,
     search_chunks,
 )
-from chat.verify import check_answer
+from core.verify import check_generation
 
 log = logging.getLogger(__name__)
 T = TypeVar("T")
@@ -104,22 +105,14 @@ def _run(message: Message, question: str, client: FastAPIClient) -> str:
         search_chunks(vector, min_similarity=getattr(settings, "RAG_MIN_SIMILARITY", None))
     )
     if not documents:
-        # 근거가 없어도 /generate 로 답을 받아 저장한다(/fallback 은 Gemini 연결 전이라 쓰지 않는다).
-        # 인용할 문서가 없으므로 코드 검증은 건너뛰고, 근거 없는 답이라 answer_cache 에는 넣지 않는다.
-        # source 는 table.sql 의 CHECK(cache/generated/fallback) 때문에 generated 로 두고 verification 에 표시한다.
-        answer = with_infra_retry(_with_slot(lambda: client.generate(question)))
-        return _close(
-            message,
-            Message.Status.DONE,
-            answer=answer,
-            source=Message.Source.GENERATED,
-            cited=[],
-            verification={"passed": True, "no_evidence": True},
-        )
+        # 색인이 비었거나 임계값에 걸린 것: 유저 탓이 아니고 재시도해도 같으니 바로 failed.
+        # 근거 없이 생성하면 코드 검증을 건너뛴 답이 나가므로 /generate 를 부르지 않는다.
+        return _close(message, Message.Status.FAILED, error="no_evidence")
 
-    answer = with_infra_retry(_with_slot(lambda: client.generate(build_prompt(question, documents))))
+    generated = with_infra_retry(_with_slot(lambda: client.generate(build_prompt(question, documents))))
+    answer = generated.text
 
-    result = check_answer(answer, documents)
+    result = check_generation(answer, documents, truncated=generated.truncated)
     if not result.passed:
         # 검증에 실패한 답은 저장하지 않는다(사용자에게 보이지 않는다). 이유만 남긴다.
         log.warning("message %s failed code checks: %s", message.pk, result.reasons)
@@ -176,7 +169,24 @@ def _close(
     message.verification = verification
     message.error = error
     message.save()
+    log_job(message)
     return status
+
+
+def log_job(message: Message) -> None:
+    """끝난 job 하나를 한 줄로. README 의 검증 통과율·캐시 적중·응답 시간을 이 줄로 집계한다.
+
+    reason: 실패·거절 코드(no_evidence, verification_failed, infra, ...)와 검증 사유(unsupported_fact, truncated, ...).
+    e2e_s: 질문 저장부터 끝날 때까지 (큐 대기·재시도 포함). 모델 시간은 ai 쪽 metric=generate 에 있다.
+    집계: kubectl logs deploy/cloud-backend-worker | grep 'metric=job'
+    """
+    reasons = [(message.error or "").split(":", 1)[0]] if message.error else []
+    reasons += (message.verification or {}).get("reasons", [])
+    e2e = (timezone.now() - message.created_at).total_seconds() if message.created_at else 0.0
+    log.info(
+        "metric=job message=%s status=%s source=%s reason=%s retries=%s e2e_s=%.1f",
+        message.pk, message.status, message.source or "-", ",".join(reasons) or "-", message.retry_count, e2e,
+    )
 
 
 def _retry_or_fail(message: Message, error: str) -> str:
@@ -188,6 +198,7 @@ def _retry_or_fail(message: Message, error: str) -> str:
         message.status = Message.Status.FAILED
         message.save()
         log.error("message %s failed after %s attempts: %s", message.pk, message.retry_count, error)
+        log_job(message)
         return Message.Status.FAILED
     message.status = Message.Status.PENDING
     message.save()
