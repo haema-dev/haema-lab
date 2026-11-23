@@ -25,7 +25,10 @@ spec:
         env:
         # config.py 의 필수값 3개. 하나라도 없으면 기동 시 바로 실패한다.
         - name: OLLAMA_BASE_URL
-          value: "http://100.116.89.109:11434"   # Node B (Ollama LXC, Tailscale). 파드에서 도달 가능한지 미검증
+          # 노드 중계기(kubes 의 systemd ollama-relay: socat 10.244.247.192:11434 -> Tailscale 100.116.89.109:11434).
+          # 파드는 Tailscale IP 로 직접 못 나간다(출발지가 파드 IP 라 tailnet 이 버림). 노드가 대신 접속한다.
+          # 10.244.247.192 는 kubes 의 vxlan.calico 주소: 파드에서만 닿고 LAN 에는 노출되지 않는다.
+          value: "http://10.244.247.192:11434"
         - name: GENERATE_MODEL
           value: "qwen3.5:27b"
         - name: EMBED_MODEL

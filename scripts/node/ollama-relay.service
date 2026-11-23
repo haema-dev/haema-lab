@@ -1,0 +1,28 @@
+# kubes(쿠버 노드) 에 두는 중계기: 파드 -> 노드 -> Tailscale -> Ollama(Node B).
+#
+# 왜 필요한가: 파드가 Tailscale IP(100.x)로 직접 보내면 출발지가 파드 IP(10.244.x)라 상대 tailnet 이 버린다.
+#   노드는 tailnet 멤버(100.88.0.42)라 닿으므로, 노드가 대신 접속한다. Ollama 서버는 다른 대역(192.168.35.x)이라 LAN 으로는 못 간다.
+# 대기 주소 10.244.247.192: kubes 의 vxlan.calico 주소. 파드에서만 닿고 LAN(192.168.45.x)에는 노출되지 않는다.
+#   노드를 다시 만들면 바뀔 수 있다: ip -4 -br addr show vxlan.calico 로 확인하고,
+#   이 파일과 manifests/ai/ai-deployment.yaml 의 OLLAMA_BASE_URL 을 같이 바꾼다.
+#
+# 설치 (kubes 에서):
+#   sudo apt-get install -y socat
+#   sudo cp scripts/node/ollama-relay.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now ollama-relay
+# 확인:
+#   systemctl is-active ollama-relay
+#   kubectl exec deploy/cloud-ai -- python -c "import httpx;print(httpx.get('http://10.244.247.192:11434/api/version',timeout=5).text)"
+[Unit]
+Description=Relay pods -> Ollama over Tailscale
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+# 부팅 직후 vxlan.calico 가 아직 없으면 bind 가 실패한다: Restart 로 생길 때까지 다시 시도한다.
+ExecStart=/usr/bin/socat TCP-LISTEN:11434,bind=10.244.247.192,fork,reuseaddr TCP:100.116.89.109:11434
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

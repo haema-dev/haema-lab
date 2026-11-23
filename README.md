@@ -31,7 +31,7 @@ A verified RAG Q&A service over official economic data, built on two fixed home-
 **Boundaries**
 
 - **Only Django touches PostgreSQL.** FastAPI holds no DB credentials, so a model-side failure or prompt injection cannot reach the database.
-- **FastAPI is a stateless model gateway** for Ollama (Node B, over Tailscale) and the Gemini API.
+- **FastAPI is a stateless model gateway** for Ollama (Node B, over Tailscale via a node-level relay, `scripts/node/ollama-relay.service`) and the Gemini API.
 - **Redis, FastAPI and ArgoCD are not routed through the Gateway.**
 - Source documents are indexed by a batch job, never inside a user request. Generated answers live in a separate cache table and are never retrieved as evidence.
 
@@ -132,31 +132,30 @@ repo/
   │             ├── argocd-setup.yaml        # ArgoCD
   │             ├── deploy-gateway.yml
   │             ├── deploy-frontend.yml
-  │             ├── deploy-backend.yml       # (planned)
-  │             └── deploy-ai.yml            # (planned)
+  │             ├── deploy-backend.yml
+  │             └── deploy-ai.yml
   │
   ├── apps/
   │     ├── gateway/    # Kotlin + Spring
   │     ├── frontend/   # Typescript + React
-  │     ├── backend/    # Python + Django (API + worker)   (planned)
-  │     └── ai/         # Python + FastAPI (model gateway) (planned)
+  │     ├── backend/    # Python + Django (API + worker)
+  │     └── ai/         # Python + FastAPI (model gateway)
   │
   ├── argocd/
   │     ├── gateway.yaml
   │     ├── frontend.yaml
-  │     ├── redis.yaml        # (planned)
-  │     ├── backend.yaml      # (planned)
-  │     ├── ai.yaml           # (planned)
+  │     ├── redis.yaml
+  │     ├── backend.yaml
+  │     ├── ai.yaml
   │     └── root-app.yaml
   │
   ├── manifests/
   │     ├── gateway/          # Kotlin + Spring
   │     ├── frontend/         # Typescript + React
-  │     ├── redis/            # StatefulSet + AOF   (planned)
-  │     ├── backend/          # Python + Django     (planned)
-  │     └── ai/               # Python + FastAPI    (planned)
+  │     ├── redis/            # StatefulSet + AOF
+  │     ├── backend/          # Python + Django
+  │     └── ai/               # Python + FastAPI
   │
-  ├── docs/adr/               # Design decision records (planned)
   └── README.md
 ```
 

@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
 
-    # Ollama (Node B, Tailscale 경유). 기본값 없음: 환경변수로만 준다.
+    # Ollama (Node B). 클러스터에서는 노드 중계기 -> Tailscale 경유 (scripts/node/ollama-relay.service). 기본값 없음: 환경변수로만 준다.
     # OLLAMA_BASE_URL, GENERATE_MODEL, EMBED_MODEL 중 하나라도 없으면 기동 시 바로 실패한다.
     ollama_base_url: str
     generate_model: str

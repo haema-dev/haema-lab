@@ -47,15 +47,27 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 5. Docker 이미지 빌드 및 푸시
+      # 5. Docker 이미지 빌드 및 푸시 (buildx + GitHub Actions 캐시)
+      #    캐시가 없으면 러너가 매번 의존성 레이어를 새로 만들고, 내용이 같아도 digest 가 달라져 큰 레이어를 매번 다시 올린다.
+      #    gha 캐시로 같은 레이어를 재사용하면 바뀐 소스 레이어만 올라간다. 진행 로그도 레이어별 Waiting 반복 없이 짧다.
+      - name: 🧰 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🏷️ Image name
+        id: image
+        # GHCR 규격: 이미지 이름은 소문자
+        run: echo "name=$(echo "ghcr.io/${{ github.repository_owner }}/cloud-frontend" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
       - name: 🐳 Build and Push Docker Image
-        run: |
-          IMAGE_NAME=$(echo "ghcr.io/${{ github.repository_owner }}/cloud-frontend" | tr '[:upper:]' '[:lower:]')
-          TAG=${{ github.sha }}
-          # Dockerfile은 apps/frontend/ 경로에 있어야 함
-          docker build -t $IMAGE_NAME:$TAG -t $IMAGE_NAME:latest ./apps/frontend
-          docker push $IMAGE_NAME:$TAG
-          docker push $IMAGE_NAME:latest
+        uses: docker/build-push-action@v6
+        with:
+          context: ./apps/frontend
+          push: true
+          tags: |
+            ${{ steps.image.outputs.name }}:${{ github.sha }}
+            ${{ steps.image.outputs.name }}:latest
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
 
       # 6. K8s 매니페스트 태그 자동 수정 
       - name: 📝 Update K8s Manifest
