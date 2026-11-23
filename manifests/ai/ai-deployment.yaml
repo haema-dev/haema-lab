@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloud-ai
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cloud-ai
+  template:
+    metadata:
+      labels:
+        app: cloud-ai
+    spec:
+      # 스트리밍 생성은 길면 약 2분(README: 긴 RAG 프롬프트 total 111s)이라
+      # 롤링 업데이트 때 진행 중인 요청이 끊기지 않도록 여유를 준다.
+      terminationGracePeriodSeconds: 120
+      containers:
+      - name: ai
+        # 이 줄은 deploy-ai.yml 이 sed 로 자동 갱신한다. 최초 값은 첫 빌드 전 자리표시자.
+        image: ghcr.io/haema-dev/cloud-ai:latest
+        ports:
+        - containerPort: 8000
+        env:
+        # config.py 의 필수값 3개. 하나라도 없으면 기동 시 바로 실패한다.
+        - name: OLLAMA_BASE_URL
+          value: "http://100.116.89.109:11434"   # Node B (Ollama LXC, Tailscale). 파드에서 도달 가능한지 미검증
+        - name: GENERATE_MODEL
+          value: "qwen3.5:27b"
+        - name: EMBED_MODEL
+          value: "qwen3-embedding:0.6b"
+        # Gemini API 키는 /judge, /fallback 구현 시 Secret 으로 주입한다. 레포에 값 금지.
+        # (Secret 은 kubectl 로 클러스터에만 만든다. 아래 이름은 예시)
+        # - name: GEMINI_API_KEY
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: gemini-api
+        #       key: api-key
+        resources:
+          # 값은 추정이며 측정 전이다. 이 서비스는 얇은 프록시(httpx + FastAPI)라 작게 잡았다.
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          timeoutSeconds: 5

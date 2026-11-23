@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloud-ai-svc
+  namespace: default
+spec:
+  type: ClusterIP # 외부 노출 금지 (Gateway에 연결하지 않음, 클러스터 내부 Django 워커만 접근)
+  selector:
+    app: cloud-ai
+  ports:
+    - port: 80 # Django 워커가 찌를 포트 (http://cloud-ai-svc.default.svc.cluster.local)
+      targetPort: 8000 # FastAPI 컨테이너의 실제 포트

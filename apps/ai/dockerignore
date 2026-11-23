@@ -1,0 +1,27 @@
+# 가상환경과 캐시 (컨테이너 안에서 새로 만듦)
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 환경 변수 / 비밀값 (이미지에 넣지 않는다)
+.env
+.env.*
+
+# Git 및 에디터 설정
+.git
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+
+# 테스트 및 로그
+tests/
+*.log
+
+# Docker 설정 자체
+Dockerfile
+.dockerignore

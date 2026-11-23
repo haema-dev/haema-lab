@@ -1,0 +1,70 @@
+# Redis: Django API/워커 전용 job 큐(chat:jobs)와 GPU 세마포어(chat:gpu-slot:N).
+# 영속성은 RDB 스냅샷만 쓴다 (AOF 끔). 마지막 스냅샷 이후 쓰기는 재시작 시 잃을 수 있다.
+# 인증은 쓰지 않는다. ClusterIP 로만 열려 있고 Gateway 에 연결하지 않는다.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: cloud-redis
+  namespace: default
+spec:
+  serviceName: cloud-redis-svc
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cloud-redis
+  template:
+    metadata:
+      labels:
+        app: cloud-redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7.4-alpine
+        args:
+        # 60초 안에 쓰기가 1번이라도 있으면 스냅샷 (추정값, 미측정)
+        - "--save"
+        - "60 1"
+        - "--appendonly"
+        - "no"
+        # 큐에는 message_id 만 들어가므로 작게 잡는다 (추정값, 미측정)
+        - "--maxmemory"
+        - "128mb"
+        # 메모리가 차도 큐 항목을 지우지 않는다. 지우면 처리 안 된 요청이 조용히 사라진다.
+        - "--maxmemory-policy"
+        - "noeviction"
+        ports:
+        - containerPort: 6379
+        # redis-cli 는 LOADING 같은 에러 응답에도 종료 코드 0 을 낼 수 있어 PONG 을 직접 확인한다.
+        readinessProbe:
+          exec:
+            command: ["sh", "-c", "redis-cli ping | grep -q PONG"]
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          exec:
+            command: ["sh", "-c", "redis-cli ping | grep -q PONG"]
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          timeoutSeconds: 5
+        resources:
+          # 값은 추정이며 측정 전이다.
+          limits:
+            cpu: "200m"
+            memory: "256Mi"
+          requests:
+            cpu: "50m"
+            memory: "64Mi"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      # Kubespray 설정(bootstrap.yaml)에 local-path-provisioner 가 없어 기본 StorageClass 가 없다.
+      # 비워두면 PVC 가 Pending 으로 남으므로 redis-pv.yaml 의 정적 PV 와 같은 이름으로 묶는다.
+      storageClassName: redis-local
+      resources:
+        requests:
+          storage: 1Gi
