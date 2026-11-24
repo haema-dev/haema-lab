@@ -1,0 +1,27 @@
+Streams 큐·하트비트, 답변 캐시 수정, 평가 결과 기록, README 한국어화
+
+큐
+- Redis List(LPUSH/BRPOP) -> Streams + 컨슈머 그룹 workers (chat:jobs:stream)
+- 결과가 DB 에 저장된 뒤에만 XACK + XDEL. MAXLEN 은 쓰지 않음
+- 처리 중 15초마다 하트비트(XCLAIM JUSTID), 90초 끊기면 XAUTOCLAIM 으로 회수
+  (기존 10분 기준은 긴 job 을 살아 있는 채로 회수해 중복 처리할 수 있었음)
+- 시작 시·30초마다 옛 List 큐 항목을 Streams 로 이관, 옛 컨슈머 정리
+- 시작 시 DB 복구(requeue_stale)는 스트림 pending 에 있는 메시지를 제외
+
+답변 캐시
+- 인용 없는 답("제공된 자료에서 확인할 수 없습니다")은 캐시하지 않음
+- load_chunks 가 청크를 덮어쓰면 그 청크를 인용한 캐시 삭제
+- 인덱스 4개 추가 (운영 DB 에는 2026-11-24 에 직접 적용함)
+
+평가 결과 기록
+- eval_run / eval_result 테이블 (운영 DB 에 2026-11-24 생성함)
+  environment(local/ci/server), data_kind(mock/sample/real) 필수
+- manage.py record_eval (--json, --junit)
+
+README
+- 한국어로 다시 씀. 수치마다 출처(실측 날짜 / 이전 측정 / -)
+- 검증 결과를 로컬(mock 테스트)과 서버(실측)로 분리
+
+테스트
+- 로컬 mock: backend 81개 통과, ai 24개, gateway 4개
+- DB 필요한 테스트(test_pipeline, test_worker, test_eval_record_db)는 CI 에서 확인 필요

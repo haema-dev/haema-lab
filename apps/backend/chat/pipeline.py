@@ -133,6 +133,10 @@ def _run(message: Message, question: str, client: FastAPIClient) -> str:
         cited=cited,
         verification=result.as_dict(),
     )
+    if not cited:
+        # 인용이 없는 답(대개 "제공된 자료에서 확인할 수 없습니다")은 캐시하지 않는다.
+        # 캐시하면 근거를 추가한 뒤에도 같은 질문에 이 답이 계속 나간다.
+        return Message.Status.DONE
     AnswerCache.objects.create(
         question=question,
         question_embedding=vector,

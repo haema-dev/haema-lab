@@ -42,6 +42,15 @@ CREATE INDEX IF NOT EXISTS idx_chat_message_processing
     ON chat_message (status)
     WHERE status IN ('pending', 'processing');
 
+-- 대화의 메시지 목록: WHERE conversation_id = ? ORDER BY id DESC (정렬 없이 인덱스 순서로 읽는다)
+CREATE INDEX IF NOT EXISTS idx_chat_message_conversation_id
+    ON chat_message (conversation_id, id DESC);
+
+-- 질문할 때마다 세는 유저별 처리 중 개수(MAX_PENDING_PER_USER)
+CREATE INDEX IF NOT EXISTS idx_chat_message_user_in_flight
+    ON chat_message (user_id)
+    WHERE status IN ('pending', 'processing');
+
 
 CREATE TABLE IF NOT EXISTS source_document (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -85,3 +94,55 @@ CREATE TABLE IF NOT EXISTS answer_cache (
 CREATE INDEX IF NOT EXISTS idx_answer_cache_embedding
     ON answer_cache
     USING hnsw (question_embedding vector_cosine_ops);
+
+-- 완전 일치 캐시: 질문마다 WHERE question = ? 로 먼저 찾는다
+CREATE INDEX IF NOT EXISTS idx_answer_cache_question
+    ON answer_cache (question);
+
+-- 재색인 시 캐시 무효화: WHERE cited_chunk_ids && ARRAY[...]
+CREATE INDEX IF NOT EXISTS idx_answer_cache_cited
+    ON answer_cache
+    USING gin (cited_chunk_ids);
+
+-- 테스트·평가 결과. 근거로 검색하지 않는다(서비스 데이터와 무관).
+-- 실행 한 번 = eval_run 한 행, 그 안의 케이스 = eval_result 여러 행. 기록은 manage.py record_eval 로만 한다.
+CREATE TABLE IF NOT EXISTS eval_run (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    -- unit: 단위 테스트, golden: 골든셋 평가(Recall@5, MRR 등), cycle: 질문 -> done 사이클, bench: 모델 성능 측정
+    kind VARCHAR(16) NOT NULL
+        CHECK (kind IN ('unit', 'golden', 'cycle', 'bench')),
+    -- 어디서 돌렸나: local(개발 PC), ci(GitHub Actions), server(배포된 클러스터)
+    environment VARCHAR(16) NOT NULL
+        CHECK (environment IN ('local', 'ci', 'server')),
+    -- 무엇으로 돌렸나: mock(가짜 의존), sample(샘플 데이터), real(실제 데이터·모델)
+    data_kind VARCHAR(16) NOT NULL
+        CHECK (data_kind IN ('mock', 'sample', 'real')),
+    target VARCHAR(32) NOT NULL DEFAULT '',   -- ai, backend, gateway, cluster 등
+    git_sha VARCHAR(40),
+    started_at TIMESTAMPTZ NOT NULL,
+    finished_at TIMESTAMPTZ,
+    passed BOOLEAN NOT NULL,                  -- skip 을 뺀 모든 케이스가 pass
+    summary JSONB NOT NULL DEFAULT '{}',      -- 집계 지표: {"recall_at_5": 1.0, "mrr": 0.812, "e2e_s": 21.5, ...}
+    note TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 회귀 비교: 같은 종류·환경의 최근 실행
+CREATE INDEX IF NOT EXISTS idx_eval_run_kind_env_started
+    ON eval_run (kind, environment, started_at DESC);
+
+
+CREATE TABLE IF NOT EXISTS eval_result (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    run_id BIGINT NOT NULL
+        REFERENCES eval_run(id) ON DELETE CASCADE,
+    name VARCHAR(300) NOT NULL,               -- 테스트 이름 또는 골든셋 문항 id
+    status VARCHAR(8) NOT NULL
+        CHECK (status IN ('pass', 'fail', 'skip', 'error')),
+    duration_ms INTEGER,
+    metrics JSONB NOT NULL DEFAULT '{}',      -- 케이스별 지표: {"rank": 1, "e2e_s": 21.5, ...}
+    message TEXT,                             -- 실패 메시지
+
+    CONSTRAINT uq_eval_result_run_name
+        UNIQUE (run_id, name)
+);

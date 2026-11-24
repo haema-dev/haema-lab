@@ -5,6 +5,7 @@
 
 같은 (url, chunk_index) 의 내용이 그대로고 임베딩이 있으면 건너뛴다(여러 번 실행해도 안전).
 문서는 있는 그대로 임베딩한다(질의에만 instruction 을 붙인다).
+기존 청크를 고치면 같은 id 로 덮어쓰므로, 그 청크를 인용한 답변 캐시를 지운다(옛 근거로 만든 답이 새 근거를 인용한 것처럼 나가지 않게).
 """
 
 import json
@@ -14,6 +15,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 from chat.fastapi_client import FastAPIClient
 from chat.models import SourceChunk, SourceDocument
+from chat.retrieval import invalidate_cache_for_chunks
 
 
 class Command(BaseCommand):
@@ -47,6 +49,7 @@ class Command(BaseCommand):
 
         client = FastAPIClient()
         inserted = updated = 0
+        changed_ids: list[int] = []
         try:
             for start in range(0, len(pending), batch_size):
                 batch = pending[start : start + batch_size]
@@ -55,11 +58,17 @@ class Command(BaseCommand):
                     document, _ = SourceDocument.objects.update_or_create(
                         url=url, defaults={"title": title, "published_at": published_at}
                     )
-                    _, created = SourceChunk.objects.update_or_create(
+                    chunk, created = SourceChunk.objects.update_or_create(
                         document=document, chunk_index=index, defaults={"content": content, "embedding": vector}
                     )
                     inserted += created
                     updated += not created
+                    if not created:
+                        changed_ids.append(chunk.pk)
         finally:
             client.close()
-        self.stdout.write(f"inserted={inserted} updated={updated} unchanged={unchanged}")
+            # 중간에 실패해도 이미 덮어쓴 청크의 캐시는 지운다.
+            invalidated = invalidate_cache_for_chunks(changed_ids)
+        self.stdout.write(
+            f"inserted={inserted} updated={updated} unchanged={unchanged} cache_invalidated={invalidated}"
+        )
