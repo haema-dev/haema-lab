@@ -30,6 +30,12 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
           </h3>
           <nav className="sidebar-nav-list">
             <NavLink
+              to="/query"
+              className={({ isActive }) => `sys-nav-link ${isActive ? 'active' : ''}`}
+            >
+              [00] RAG_QUERY
+            </NavLink>
+            <NavLink
               to="/scanner"
               className={({ isActive }) => `sys-nav-link ${isActive ? 'active' : ''}`}
             >
