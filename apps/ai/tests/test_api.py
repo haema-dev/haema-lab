@@ -41,7 +41,8 @@ def test_embed_forwards_inputs_and_returns_vectors(client):
     resp = client.post("/embed", json={"inputs": ["a", "b"]})
 
     assert resp.status_code == 200
-    assert resp.json() == {"embeddings": [[0.1, 0.2], [0.3, 0.4]]}
+    assert resp.json()["embeddings"] == [[0.1, 0.2], [0.3, 0.4]]
+    assert set(resp.json()["metrics"]) == {"inputs", "load_s", "total_s", "wall_s"}
     sent = route.calls.last.request
     assert httpx.Response(200, content=sent.content).json() == {"model": "embed-model", "input": ["a", "b"]}
 
@@ -60,7 +61,8 @@ def test_generate_reports_truncation(client, done_reason, truncated):
     resp = client.post("/generate", json={"prompt": "질문"})
 
     assert resp.status_code == 200
-    assert resp.json() == {"text": "답 [12]", "truncated": truncated}
+    body = resp.json()
+    assert (body["text"], body["truncated"]) == ("답 [12]", truncated)
 
 
 def test_generate_sends_fixed_limits_and_reasoning_off(client):
@@ -195,3 +197,28 @@ def test_health_probe_is_not_access_logged(caplog):
         access.info(fmt, "10.0.0.1:5", "POST", "/generate", "1.1", 200)
 
     assert [r.getMessage() for r in caplog.records] == ['10.0.0.1:5 - "POST /generate HTTP/1.1" 200']
+
+
+def test_generate_returns_token_and_time_metrics(client):
+    client.ollama.post("/api/generate").respond(json={
+        "response": "x", "done": True, "done_reason": "stop",
+        "prompt_eval_count": 700, "prompt_eval_duration": 10_000_000_000,
+        "eval_count": 90, "eval_duration": 20_000_000_000,
+        "load_duration": 500_000_000, "total_duration": 30_500_000_000,
+    })
+
+    metrics = client.post("/generate", json={"prompt": "질문"}).json()["metrics"]
+
+    assert metrics["prompt_tokens"] == 700 and metrics["output_tokens"] == 90
+    assert (metrics["prompt_tok_s"], metrics["output_tok_s"]) == (70.0, 4.5)
+    assert (metrics["ttft_s"], metrics["load_s"], metrics["total_s"]) == (10.5, 0.5, 30.5)
+    assert metrics["done_reason"] == "stop"
+
+
+def test_embed_returns_time_metrics(client):
+    client.ollama.post("/api/embed").respond(json={"embeddings": [[0.1]], "total_duration": 650_000_000,
+                                                   "load_duration": 50_000_000})
+
+    metrics = client.post("/embed", json={"inputs": ["질문"]}).json()["metrics"]
+
+    assert (metrics["inputs"], metrics["total_s"], metrics["load_s"]) == (1, 0.65, 0.05)

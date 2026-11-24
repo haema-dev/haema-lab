@@ -152,6 +152,11 @@ FASTAPI_TIMEOUT_SECONDS = 200.0
 FASTAPI_INFRA_RETRY_DELAYS = (5, 12)
 # 인프라 실패 시 job 전체를 다시 큐에 넣는 횟수(첫 시도 포함).
 JOB_MAX_ATTEMPTS = 2
+
+# Discord 웹훅 알림 (chat/notify.py). URL 은 GitHub Secret DISCORD_WEBHOOK_URL -> backend-secret 으로 주입. 비면 보내지 않는다.
+DISCORD_WEBHOOK_URL = os.environ.get('DISCORD_WEBHOOK_URL', '')
+DISCORD_NOTIFY_JOBS = os.environ.get('DISCORD_NOTIFY_JOBS', '1') != '0'  # job 마다 결과 수치 알림
+DISCORD_ERROR_COOLDOWN_SECONDS = int(os.environ.get('DISCORD_ERROR_COOLDOWN_SECONDS', '300'))  # 같은 에러 반복 간격(정책값)
 GPU_SLOTS = 1  # iGPU 1개. 동시 호출 수는 측정 후 조정(추정)
 GPU_SLOT_TTL_SECONDS = 240  # 가장 긴 GPU 호출(FastAPI 타임아웃)보다 길게
 GPU_WAIT_SECONDS = 120

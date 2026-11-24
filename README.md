@@ -28,6 +28,7 @@
    ⑥ 코드 검증 (core/verify.py)        → 실패 → rejected, 보여주지 않음
    ⑦ 답변 저장. 근거를 인용한 답만 답변 캐시에 저장 ("확인할 수 없음" 답은 캐시하지 않음)
    ⑧ 결과가 DB 에 저장된 뒤에만 XACK + XDEL
+   ⑨ Discord 로 job 결과 수치(토큰·단계별 시간 등) 알림, 에러는 따로 알림 (웹훅이 설정돼 있을 때만)
    인프라 실패(5xx, 타임아웃, ErrorDeviceLost) → pending 으로 되돌려 재시도, 유저 실패로 세지 않음
    처리 중에는 15초마다 하트비트 → 오래 걸리는 job 도 다른 워커가 가져가지 않음
    처리 중 워커가 죽으면 하트비트가 끊기고 → 90초 뒤 살아 있는(또는 재시작된) 워커가 XAUTOCLAIM 으로 이어받음
@@ -140,22 +141,25 @@
 | 에러 코드·상태코드 분류, 요청·결과 로그 | 있음 | 배포됨 | 로그 실측은 안 함 |
 | DB 연결 장애 시 워커 재시도 | 있음 | 배포됨 | 장애 상황 실측은 안 함 (mock 테스트만) |
 | 배포 빌드 캐시 (buildx + GHA) | 있음 | 배포됨 | 빌드 시간 단축은 측정 안 함 |
-| Redis **Streams** 큐 (XADD / XREADGROUP / XACK) | 있음 | **없음** (서버는 List 큐) | mock 테스트만 |
-| 처리 중 하트비트 15초, 죽은 워커 job 90초 뒤 회수, 옛 컨슈머 정리 | 있음 | **없음** | mock 테스트만 |
-| "확인할 수 없음" 답은 캐시하지 않음 | 있음 | **없음** (서버는 캐시함) | mock + CI DB 테스트 |
-| 근거 청크가 바뀌면 그 청크를 인용한 캐시 삭제 | 있음 | **없음** | mock + CI DB 테스트 |
-| 인덱스 4개 (메시지 목록, 유저별 처리 중, 캐시 질문, 캐시 인용) | `table.sql` 에 있음 | **DB 에 적용됨** | 운영 DB 에 직접 생성, `indisvalid = true` 확인 |
-| 테스트·평가 결과 기록 (`eval_run`, `eval_result`, `record_eval`) | 있음 | 테이블은 **DB 에 생성됨**, `record_eval` 명령은 미배포 | 운영 DB 에 직접 생성, 제약 8개·인덱스 확인, 잘못된 환경값(`prod`) 거절 확인 (2026-11-24) |
+| Redis **Streams** 큐 (XADD / XREADGROUP / XACK) | 있음 | **동작** (PR #30) | 생성·캐시·거절 사이클 모두 `done` (아래 서버 표) |
+| 처리 중 하트비트 15초, 죽은 워커 job 90초 뒤 회수, 옛 컨슈머 정리 | 있음 | 배포됨 | 워커가 죽는 상황은 실측 안 함 (mock 테스트만) |
+| 인용 없는 "확인할 수 없음" 답은 캐시하지 않음 | 있음 | 배포됨 | mock + CI DB 테스트 |
+| **인용이 붙은** "확인할 수 없음" 답도 캐시하지 않음 | 있음 | **없음** | 서버 실측에서 발견 (아래 C), 로컬에서 수정 |
+| 근거 청크가 바뀌면 그 청크를 인용한 캐시 삭제 | 있음 | 배포됨 | 재색인은 실측 안 함 (mock + CI DB 테스트) |
+| 인덱스 4개 (메시지 목록, 유저별 처리 중, 캐시 질문, 캐시 인용) | `table.sql` 에 있음 | DB 에 적용됨 | 운영 DB 에 직접 생성, `indisvalid = true` 확인 |
+| 테스트·평가 결과 기록 (`eval_run`, `eval_result`, `record_eval`) | 있음 | 테이블 생성됨, 명령 배포됨 | 제약 8개·인덱스 확인, 잘못된 환경값(`prod`) 거절 확인. 아직 기록 0건 |
+| ai 응답에 토큰 수·시간 지표 (`metrics`) | 있음 | **없음** | ai 테스트 (필드 추가라 기존 backend 와 호환) |
+| Discord 알림 (job 결과 수치, 에러) | 있음 | **없음** | mock 테스트. GitHub Secret `DISCORD_WEBHOOK_URL` 주입 필요 |
 
-"없음"은 로컬 코드를 머지하고 배포하면 서버에도 생깁니다. 그 전까지 서버 실측값은 이전 버전(List 큐) 기준입니다.
+"없음"은 로컬 코드를 머지하고 배포하면 서버에도 생깁니다.
 
 ### 로컬: 테스트 (2026-11-24 실행)
 
 | 앱 | 범위 | 결과 |
 | :-- | :-- | :-- |
-| ai (pytest) | 게이트웨이 계약, 에러 코드·상태코드 분류, 요청·결과 로그, 연결 타임아웃 | 24개 통과 |
-| backend (Django, DB 없이) | 코드 검증(`core`), FastAPI 클라이언트, 미들웨어, Streams 큐, 워커 ack·회수·하트비트, 캐시 무효화, 평가 결과 입력 검증 | 81개 통과 |
-| backend (Django, DB 필요) | 파이프라인, 워커, 색인, 캐시 미저장·무효화, 평가 결과 저장 | CI 에서만 실행. 로컬에서는 문법만 확인 |
+| ai (pytest) | 게이트웨이 계약, 에러 코드·상태코드 분류, 요청·결과 로그, 연결 타임아웃, 토큰·시간 지표 | 26개 통과 |
+| backend (Django, DB 없이) | 코드 검증(`core`), FastAPI 클라이언트·지표, 미들웨어, Streams 큐, 워커 ack·회수·하트비트, 캐시 무효화, 평가 결과 입력 검증, Discord 알림 | 89개 통과 |
+| backend (Django, DB 필요) | 파이프라인(단계별 시간·알림 포함), 워커, 색인, 캐시 미저장·무효화, 평가 결과 저장 | CI 에서만 실행. 로컬에서는 문법만 확인 |
 | gateway (Gradle) | 라우팅 (`/api` 기본 꺼짐) | 4개 통과 |
 
 backend 의 DB 테스트는 CI 에서 실제 PostgreSQL + pgvector 컨테이너를 씁니다 (`chat_*` 테이블이 pgvector 타입이라 mock 불가). CI 는 PR 에서 바뀐 앱의 테스트만 돌리고, 필수 체크는 `test-result` 하나입니다.
@@ -173,7 +177,7 @@ python manage.py record_eval --json cycle.json
 
 같은 종류·환경의 최근 실행을 비교할 수 있게 `(kind, environment, started_at DESC)` 인덱스를 둡니다. 회귀 기준("0.02 넘게 떨어지면 실패")은 이 기록을 비교해서 판단합니다.
 
-### 서버: 실측 (배포 버전 = List 큐)
+### 서버: 실측
 
 **요청 확인** (2026-11-24):
 
@@ -185,22 +189,36 @@ python manage.py record_eval --json cycle.json
 | Gateway `/api/**` | 404 (기본 꺼짐) |
 | DB 연결 경로 | 서버가 본 클라이언트 주소가 접속한 PC 주소 → pgBouncer 없이 5432 직접 연결 |
 
-**한 사이클** (쿠버 백엔드로 질문 → `done`, DB 의 `created_at` → `updated_at`):
+**한 사이클 — Streams 큐 버전 (PR #30 배포 후, 2026-11-24)**. 쿠버 백엔드로 질문 → `done`, 시간은 DB 의 `created_at` → `updated_at`:
+
+| 경우 | 시간 | 결과 |
+| :-- | :-- | :-- |
+| A. 근거로 답할 수 있는 질문 (새로 생성, 2문장) | 19.6초 | `done`, 인용 [1], 검증 통과 |
+| B. A 와 같은 질문 (완전 일치 캐시) | 0.1초 미만 | `done`, source=cache |
+| C. 근거에 없는 질문 (거절 답) | 13.7초 | `done`, **거절 답인데 인용 [1] 이 붙어 캐시됨** → 로컬에서 수정 (거절 문구로 판단) |
+
+각 1회 측정입니다.
+
+**한 사이클 — 이전 List 큐 버전** (참고):
 
 | 경우 | 시간 | 결과 | 출처 |
 | :-- | :-- | :-- | :-- |
 | 새로 생성, 근거 인용 답 (2문장) | 21.5초 | `done`, 인용 [1], 검증 통과 | 실측 2026-11-24 (1회) |
 | 같은 질문 다시 (완전 일치 캐시) | 0.2초 | `done`, source=cache | 실측 2026-11-24 (1회) |
-| 새로 생성, "자료에서 확인할 수 없음" 답 | 11.8초 | `done`, 인용 없음 | 실측 2026-11-23 (1회) |
+| 새로 생성, 인용 없는 거절 답 | 11.8초 | `done` | 실측 2026-11-23 (1회) |
 | 모델 서버에 닿지 않을 때 실패 확정 | 65초 | `failed` | 실측 2026-11-23 (1회) |
 
-**서버 데이터 상태** (읽기 전용, 2026-11-24): 근거 청크 1개 (금리 정의 문서), 답변 캐시 3행 (모두 근거 인용).
+**서버 데이터 상태** (읽기 전용, 2026-11-24): 근거 청크 1개 (금리 정의 문서), 답변 캐시 3행 (모두 근거 인용 답. 인용 붙은 거절 답 2행 — 위 C 와 10월 1일 테스트분 — 은 2026-11-24 삭제), 평가 기록 0건.
 
 ## 🔔 모니터링과 리포트
 
 - **로그**: ai 와 backend 모두 요청 한 줄, 결과 한 줄을 남깁니다 (`req`/`res`, 같은 `X-Request-Id`). 실패는 에러 코드로 나눕니다 (예: `ollama_unreachable` 503, `ollama_timeout` 504, `ollama_http_<코드>` 502). job 결과는 `metric=job` 한 줄로 집계합니다.
 - **점검 스크립트**: `scripts/preflight.sh` 가 사이클 테스트 전에 Secret, Redis, 노드 중계기, ai → Ollama, DB 테이블·근거 청크, 워커를 읽기 전용으로 확인합니다.
-- **실시간 알림 (Discord, 계획)**: 러너 재시작, 처리 불가 job, 검증 실패 급증, 큐 포화, Gemini 예산 초과. 같은 알림의 반복 간격: -.
+- **Discord 알림** (`chat/notify.py`, 웹훅 URL 은 GitHub Secret `DISCORD_WEBHOOK_URL` → `backend-secret`. 없으면 꺼짐):
+  - **job 결과** (끝날 때마다, `DISCORD_NOTIFY_JOBS=0` 으로 끌 수 있음): 상태, 출처, 전체 시간, 워커 처리 시간, 재시도, 사유, 단계별 시간(임베딩·검색·생성), 프롬프트·출력 토큰, 생성 속도·프롬프트 처리 tok/s, TTFT, 모델 로드, 답변 길이, 인용 수, 검증 결과. 사용자 질문·답변 본문은 보내지 않습니다.
+  - **에러**: 인프라 실패(재시도 때, 에러 코드별), 워커 예외, DB·Redis 연결 실패. 같은 에러는 `DISCORD_ERROR_COOLDOWN_SECONDS`(기본 300초, 정책값) 안에 한 번만 보냅니다.
+  - 보내기는 별도 스레드에서 하고, 실패해도 서비스에 영향이 없습니다 (로그만 남김). 웹훅 URL 은 로그에 남기지 않습니다.
+- **계획 중인 알림**: 처리 불가 job, 검증 실패 급증, 큐 포화, Gemini 예산 초과.
 - **일일 리포트 (계획)**: SQL 로 지표를 집계하고 Gemini 가 리뷰를 쓰며, 리뷰의 모든 수치는 게시 전에 집계값과 대조합니다.
 
 ## 🤖 AI 활용 개발
@@ -222,7 +240,7 @@ python manage.py record_eval --json cycle.json
 - **오케스트레이션**: Kubespray/Ansible 로 구성한 Kubernetes (CNI Calico, kube-proxy IPVS)
 - **네트워크·접근**: Cloudflare Tunnel, Tailscale (메시 VPN), 노드 중계기 (socat)
 - **CI/CD·GitOps**: GitHub Actions (buildx + GHA 캐시), ArgoCD
-- **모니터링**: Proxmox, ArgoCD, 구조화 로그 (Discord Webhook 은 계획)
+- **모니터링**: Proxmox, ArgoCD, 구조화 로그, Discord Webhook (job 결과·에러)
 - **LLM 파이프라인**: Ollama + FastAPI (모델 게이트웨이), Django 워커 (`run_worker`), 색인은 `manage.py load_chunks`. 리포트용 Kubernetes CronJob 은 계획
 - **모델**: qwen3.5:27b (생성), qwen3-embedding:0.6b (임베딩), Gemini API (검증, 계획)
 - **언어·프레임워크**: Python, Django, FastAPI, Kotlin, Spring Boot
