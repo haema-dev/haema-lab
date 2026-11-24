@@ -33,6 +33,30 @@ def _rate(count: object, ns: object) -> float:
     return count / seconds if isinstance(count, (int, float)) and seconds > 0 else 0.0
 
 
+def generate_metrics(data: dict, wall_s: float) -> dict:
+    """Ollama 생성 응답의 토큰 수·시간. 응답(metrics)으로 돌려주고 같은 값을 로그에도 남긴다."""
+    return {
+        "prompt_tokens": data.get("prompt_eval_count"),
+        "prompt_tok_s": round(_rate(data.get("prompt_eval_count"), data.get("prompt_eval_duration")), 1),
+        "output_tokens": data.get("eval_count"),
+        "output_tok_s": round(_rate(data.get("eval_count"), data.get("eval_duration")), 2),
+        "ttft_s": round(_s(data.get("load_duration")) + _s(data.get("prompt_eval_duration")), 2),
+        "load_s": round(_s(data.get("load_duration")), 2),
+        "total_s": round(_s(data.get("total_duration")), 2),
+        "wall_s": round(wall_s, 2),
+        "done_reason": data.get("done_reason"),
+    }
+
+
+def embed_metrics(data: dict, inputs: int, wall_s: float) -> dict:
+    return {
+        "inputs": inputs,
+        "load_s": round(_s(data.get("load_duration")), 2),
+        "total_s": round(_s(data.get("total_duration")), 2),
+        "wall_s": round(wall_s, 2),
+    }
+
+
 def log_generate_metrics(data: dict, wall_s: float) -> None:
     """README 의 측정값(생성 tok/s, 프롬프트 처리 tok/s, TTFT, 총 시간)을 요청마다 한 줄로 남긴다.
 
@@ -82,6 +106,10 @@ class OllamaClient:
         return resp.json()
 
     async def embed(self, inputs: list[str]) -> list[list[float]]:
+        vectors, _metrics = await self.embed_with_metrics(inputs)
+        return vectors
+
+    async def embed_with_metrics(self, inputs: list[str]) -> tuple[list[list[float]], dict]:
         t0 = time.perf_counter()
         data = await self._post(
             "/api/embed",
@@ -89,13 +117,15 @@ class OllamaClient:
             timeout=EMBED_TIMEOUT,
         )
         # README: 질의 임베딩 약 0.65초. inputs=1 이 질의, 그 이상은 색인 배치다.
-        log.info(
-            "metric=embed inputs=%d total_s=%.2f wall_s=%.2f",
-            len(inputs), _s(data.get("total_duration")), time.perf_counter() - t0,
-        )
-        return data["embeddings"]
+        wall = time.perf_counter() - t0
+        log.info("metric=embed inputs=%d total_s=%.2f wall_s=%.2f", len(inputs), _s(data.get("total_duration")), wall)
+        return data["embeddings"], embed_metrics(data, len(inputs), wall)
 
     async def generate(self, prompt: str) -> tuple[str, bool]:
+        text, truncated, _metrics = await self.generate_with_metrics(prompt)
+        return text, truncated
+
+    async def generate_with_metrics(self, prompt: str) -> tuple[str, bool, dict]:
         """비스트리밍: (답, 잘림 여부). num_predict 상한에 걸리면 Ollama 가 done_reason "length" 를 준다.
 
         잘린 답은 문장 경계에서 끊길 수 있어 글자만으로는 알 수 없으므로 이 값을 그대로 넘긴다.
@@ -106,8 +136,9 @@ class OllamaClient:
             self._generate_payload(prompt, stream=False),
             timeout=GENERATE_TIMEOUT,
         )
-        log_generate_metrics(data, time.perf_counter() - t0)
-        return data["response"], data.get("done_reason") == "length"
+        wall = time.perf_counter() - t0
+        log_generate_metrics(data, wall)
+        return data["response"], data.get("done_reason") == "length", generate_metrics(data, wall)
 
     async def generate_stream(self, prompt: str) -> AsyncIterator[str]:
         """스트리밍: Ollama NDJSON을 읽어 토큰 조각(str)을 yield 한다."""

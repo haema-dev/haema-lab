@@ -11,7 +11,7 @@ import logging
 import time
 import uuid
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, TypeVar
 
 import httpx
@@ -77,6 +77,7 @@ def _body_code(response: httpx.Response) -> str | None:
 class GenerateResult:
     text: str
     truncated: bool  # num_predict 상한에 걸려 잘림. 완결성 검사(core.verify.check_generation)가 쓴다.
+    metrics: dict = field(default_factory=dict)  # ai 가 준 토큰 수·시간. 알림용, 없으면 빈 dict
 
 
 class FastAPIClient:
@@ -134,7 +135,10 @@ class FastAPIClient:
         return data
 
     def embed(self, texts: Sequence[str]) -> list[list[float]]:
-        vectors = self._post("/embed", {"inputs": list(texts)}).get("embeddings")
+        """벡터 목록. ai 가 준 시간 지표는 last_embed_metrics 에 남긴다(알림용, 없으면 빈 dict)."""
+        data = self._post("/embed", {"inputs": list(texts)})
+        self.last_embed_metrics = _metrics(data)
+        vectors = data.get("embeddings")
         if not isinstance(vectors, list) or len(vectors) != len(texts):
             raise FastAPIError("/embed: 입력 수와 임베딩 수가 다르다", code="bad_response")
         if any(not isinstance(v, list) or len(v) != EMBEDDING_DIMENSIONS for v in vectors):
@@ -150,7 +154,12 @@ class FastAPIClient:
         # 배포 중 구버전 게이트웨이가 잠깐 응답하는 경우라 인프라 실패로 보고 재시도한다 (배포 순서 무관).
         if not isinstance(truncated, bool):
             raise InfraError("/generate: truncated 없음(구버전 게이트웨이?)", code="old_gateway")
-        return GenerateResult(text=text, truncated=truncated)
+        return GenerateResult(text=text, truncated=truncated, metrics=_metrics(data))
+
+
+def _metrics(data: dict) -> dict:
+    metrics = data.get("metrics")
+    return metrics if isinstance(metrics, dict) else {}
 
 
 def with_infra_retry(call: Callable[[], T], *, delays: Sequence[float] | None = None, sleep=time.sleep) -> T:

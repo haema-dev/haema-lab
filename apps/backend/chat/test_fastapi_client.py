@@ -184,3 +184,19 @@ class CallLogTests(SimpleTestCase):
             client.embed(["a"])
         self.assertTrue(logs.output[-1].startswith("WARNING"))
         self.assertIn("status=503 code=ollama_unreachable", logs.output[-1])
+
+
+class MetricsTests(SimpleTestCase):
+    def test_generate_and_embed_keep_ai_metrics_when_present(self):
+        vector = [0.0] * EMBEDDING_DIMENSIONS
+        client, _ = client_returning(
+            httpx.Response(200, json={"embeddings": [vector], "metrics": {"total_s": 0.4}}),
+            httpx.Response(200, json={"text": "답", "truncated": False, "metrics": {"output_tokens": 61}}),
+        )
+        client.embed(["a"])
+        self.assertEqual(client.last_embed_metrics, {"total_s": 0.4})
+        self.assertEqual(client.generate("q").metrics, {"output_tokens": 61})
+
+    def test_old_gateway_without_metrics_still_works(self):
+        client, _ = client_returning(httpx.Response(200, json={"text": "답", "truncated": False}))
+        self.assertEqual(client.generate("q").metrics, {})

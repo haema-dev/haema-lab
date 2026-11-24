@@ -25,6 +25,7 @@ from django.core.management.base import BaseCommand
 from django.db import InterfaceError, OperationalError, connections
 from django.utils import timezone
 
+from chat import notify
 from chat.fastapi_client import FastAPIClient
 from chat.models import Message
 from chat.pipeline import process_message
@@ -165,6 +166,7 @@ class Command(BaseCommand):
                     if once:
                         raise
                     log.warning("redis unavailable, retrying in 2s", exc_info=True)
+                    notify.error("worker.redis_unavailable", "워커: Redis 연결 실패", "2초 뒤 다시 시도합니다.")
                     time.sleep(2)
                     continue
                 if not jobs:
@@ -204,8 +206,9 @@ class Command(BaseCommand):
             drop_db_connections()
             # pending 으로 되돌리고 새 항목으로 다시 넣는다. 그다음 지금 항목을 ack 한다.
             self._with_db_retry(lambda: release_for_retry(message_id), once=once, what=f"release {message_id}")
-        except Exception:
+        except Exception as exc:
             log.exception("message %s crashed", message_id)
+            notify.error("worker.crash", "워커: job 처리 중 예외", f"message {message_id}: {type(exc).__name__}: {exc}"[:500])
             # 같은 항목을 다시 처리해도 또 죽을 가능성이 크다: failed 로 닫고 ack 한다.
             try:
                 Message.objects.filter(
@@ -271,5 +274,7 @@ class Command(BaseCommand):
                 attempt += 1
                 log.warning("database unavailable during %s, retry %s in %ss: %s: %s", what, attempt, delay,
                             type(exc).__name__, exc)
+                notify.error("worker.db_unavailable", "워커: DB 연결 실패",
+                             f"{what} 중 {type(exc).__name__}: {exc}"[:500])
                 drop_db_connections()
                 time.sleep(delay)

@@ -48,6 +48,20 @@ class PipelineTests(ChatTestCase):
         self.assertEqual((status, message.status), ("done", Message.Status.DONE))
         self.assertEqual(AnswerCache.objects.count(), 0)
 
+    def test_refusal_with_a_citation_is_not_cached_either(self):
+        # 2026-11-24 서버 실측: 모델이 거절 답에 [1] 을 붙여 캐시된 사례
+        answer = f"제공된 자료에서 확인할 수 없습니다. [{self.chunk.id}] 에는 해당 내용이 없습니다."
+        status, message = self.run_message(FakeClient(answer=answer))
+        self.assertEqual(status, "done")
+        self.assertEqual(AnswerCache.objects.count(), 0)
+
+    def test_job_result_is_notified_with_stage_times(self):
+        with patch("chat.pipeline.notify.job_result") as notified:
+            self.run_message(FakeClient(answer=self.good))
+        message, trace = notified.call_args.args
+        self.assertEqual(message.status, Message.Status.DONE)
+        self.assertEqual(set(trace.stages), {"embed", "search", "generate"})
+
     def test_question_is_embedded_with_instruction_and_chunks_are_not_instructed(self):
         client = FakeClient(answer=self.good)
         self.run_message(client)

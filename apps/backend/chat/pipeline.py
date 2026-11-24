@@ -9,7 +9,11 @@ Gemini 판정(/judge)과 /fallback 은 ai 쪽에 아직 없어서 여기에도 �
 """
 
 import logging
-from collections.abc import Callable, Sequence
+import time
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass, field
 from typing import TypeVar
 
 from django.conf import settings
@@ -25,7 +29,8 @@ from chat.retrieval import (
     fit_context,
     search_chunks,
 )
-from core.verify import check_generation
+from chat import notify
+from core.verify import REFUSAL_TEXT, check_generation
 
 log = logging.getLogger(__name__)
 T = TypeVar("T")
@@ -65,6 +70,35 @@ def _with_slot(call: Callable[[], T]) -> Callable[[], T]:
     return wrapped
 
 
+@dataclass
+class JobTrace:
+    """job 하나의 단계별 시간(초)과 ai 가 준 지표. 로그·Discord 알림용이고 DB 에는 남기지 않는다."""
+
+    started: float = field(default_factory=time.monotonic)
+    stages: dict[str, float] = field(default_factory=dict)
+    embed: dict = field(default_factory=dict)
+    generate: dict = field(default_factory=dict)
+
+    @property
+    def elapsed(self) -> float:
+        return round(time.monotonic() - self.started, 2)
+
+
+_trace: ContextVar[JobTrace | None] = ContextVar("job_trace", default=None)
+
+
+@contextmanager
+def _stage(name: str) -> Iterator[None]:
+    """단계 시간을 잰다. 재시도로 여러 번 들어가면 합한다."""
+    t0 = time.monotonic()
+    try:
+        yield
+    finally:
+        trace = _trace.get()
+        if trace is not None:
+            trace.stages[name] = round(trace.stages.get(name, 0.0) + time.monotonic() - t0, 3)
+
+
 def process_message(message_id: int, *, client: FastAPIClient) -> str:
     """처리 결과 상태를 돌려준다: done / rejected / failed / pending(재시도) / skipped."""
     # 한 번만 가져간다: pending 인 것만 processing 으로 바꾼 행이 있을 때만 이어간다.
@@ -73,6 +107,14 @@ def process_message(message_id: int, *, client: FastAPIClient) -> str:
     )
     if not claimed:
         return "skipped"  # 이미 처리 중/끝남/삭제됨
+    token = _trace.set(JobTrace())
+    try:
+        return _process_claimed(message_id, client)
+    finally:
+        _trace.reset(token)
+
+
+def _process_claimed(message_id: int, client: FastAPIClient) -> str:
     message = Message.objects.get(pk=message_id)
     question = (message.question or "").strip()
     if not question:
@@ -96,23 +138,28 @@ def _run(message: Message, question: str, client: FastAPIClient) -> str:
         return _finish_from_cache(message, cached)
 
     instruction = getattr(settings, "EMBED_QUERY_INSTRUCTION", DEFAULT_QUERY_INSTRUCTION)
-    vector = with_infra_retry(
-        _with_slot(lambda: client.embed([format_query(instruction, question)])[0])
-    )
+    with _stage("embed"):
+        vector = with_infra_retry(
+            _with_slot(lambda: client.embed([format_query(instruction, question)])[0])
+        )
+    _record("embed", getattr(client, "last_embed_metrics", None))
 
     cached = find_similar_cache(vector, getattr(settings, "CACHE_MIN_SIMILARITY", None))
     if cached is not None:
         return _finish_from_cache(message, cached)
 
-    documents = fit_context(
-        search_chunks(vector, min_similarity=getattr(settings, "RAG_MIN_SIMILARITY", None))
-    )
+    with _stage("search"):
+        documents = fit_context(
+            search_chunks(vector, min_similarity=getattr(settings, "RAG_MIN_SIMILARITY", None))
+        )
     if not documents:
         # 색인이 비었거나 임계값에 걸린 것: 유저 탓이 아니고 재시도해도 같으니 바로 failed.
         # 근거 없이 생성하면 코드 검증을 건너뛴 답이 나가므로 /generate 를 부르지 않는다.
         return _close(message, Message.Status.FAILED, error="no_evidence")
 
-    generated = with_infra_retry(_with_slot(lambda: client.generate(build_prompt(question, documents))))
+    with _stage("generate"):
+        generated = with_infra_retry(_with_slot(lambda: client.generate(build_prompt(question, documents))))
+    _record("generate", getattr(generated, "metrics", None))
     answer = generated.text
 
     result = check_generation(answer, documents, truncated=generated.truncated)
@@ -133,9 +180,9 @@ def _run(message: Message, question: str, client: FastAPIClient) -> str:
         cited=cited,
         verification=result.as_dict(),
     )
-    if not cited:
-        # 인용이 없는 답(대개 "제공된 자료에서 확인할 수 없습니다")은 캐시하지 않는다.
-        # 캐시하면 근거를 추가한 뒤에도 같은 질문에 이 답이 계속 나간다.
+    if not cited or REFUSAL_TEXT in answer:
+        # "제공된 자료에서 확인할 수 없습니다" 답은 캐시하지 않는다(모델이 인용을 붙여도 마찬가지:
+        # 2026-11-24 서버 실측에서 거절 답에 [1] 이 붙어 캐시된 사례). 캐시하면 근거를 추가한 뒤에도 이 답이 계속 나간다.
         return Message.Status.DONE
     AnswerCache.objects.create(
         question=question,
@@ -180,6 +227,12 @@ def _close(
     return status
 
 
+def _record(kind: str, metrics: object) -> None:
+    trace = _trace.get()
+    if trace is not None and isinstance(metrics, dict):
+        setattr(trace, kind, metrics)
+
+
 def log_job(message: Message) -> None:
     """끝난 job 하나를 한 줄로. README 의 검증 통과율·캐시 적중·응답 시간을 이 줄로 집계한다.
 
@@ -194,6 +247,7 @@ def log_job(message: Message) -> None:
         "metric=job message=%s status=%s source=%s reason=%s retries=%s e2e_s=%.1f",
         message.pk, message.status, message.source or "-", ",".join(reasons) or "-", message.retry_count, e2e,
     )
+    notify.job_result(message, _trace.get())
 
 
 def _retry_or_fail(message: Message, error: str) -> str:
@@ -211,4 +265,8 @@ def _retry_or_fail(message: Message, error: str) -> str:
     message.save()
     enqueue_message(message.pk)
     log.warning("message %s will be retried (%s/%s): %s", message.pk, message.retry_count, max_attempts, error)
+    code = error.split(":", 1)[0]
+    notify.error(
+        code, f"인프라 실패: {code}", f"message {message.pk} 재시도 {message.retry_count}/{max_attempts}\n{error[:500]}"
+    )
     return Message.Status.PENDING

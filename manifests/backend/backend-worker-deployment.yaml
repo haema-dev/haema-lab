@@ -44,6 +44,10 @@ spec:
         - name: REDIS_URL
           valueFrom:
             secretKeyRef: { name: backend-secret, key: REDIS_URL }
+        # 선택: Discord 웹훅 (chat/notify.py). Secret 에 키가 없으면 비어 있고 알림만 꺼진다.
+        - name: DISCORD_WEBHOOK_URL
+          valueFrom:
+            secretKeyRef: { name: backend-secret, key: DISCORD_WEBHOOK_URL, optional: true }
         - name: DJANGO_DEBUG
           value: "0"
         - name: FASTAPI_BASE_URL

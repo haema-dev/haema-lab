@@ -34,14 +34,17 @@ async def health():
 
 @router.post("/embed")
 async def embed(body: EmbedRequest, client: OllamaClient = Depends(get_ollama)):
-    return {"embeddings": await client.embed(body.inputs)}
+    """metrics: 임베딩 시간(load_s, total_s, wall_s). Django 가 job 결과 알림에 쓴다(없어도 동작)."""
+    vectors, metrics = await client.embed_with_metrics(body.inputs)
+    return {"embeddings": vectors, "metrics": metrics}
 
 
 @router.post("/generate")
 async def generate(body: GenerateRequest, client: OllamaClient = Depends(get_ollama)):
     """비스트리밍: 전체 응답을 JSON 하나로 돌려준다. truncated 는 Django 의 완결성 검사가 쓴다."""
-    text, truncated = await client.generate(body.prompt)
-    return {"text": text, "truncated": truncated}
+    text, truncated, metrics = await client.generate_with_metrics(body.prompt)
+    # metrics: 토큰 수·tok/s·TTFT·시간(Ollama 값 그대로). Django 가 job 결과 알림에 쓴다(없어도 동작).
+    return {"text": text, "truncated": truncated, "metrics": metrics}
 
 
 @router.post("/generate/stream")
