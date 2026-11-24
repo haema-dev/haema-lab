@@ -2,13 +2,15 @@
 FROM node:22-alpine AS build
 WORKDIR /app
 
-# pnpm 설치 (동무가 워크플로우에서 pnpm을 썼으므로)
-RUN npm install -g pnpm
+# pnpm 설치: 버전을 고정한다 (deploy-frontend.yml 의 pnpm/action-setup 과 같은 10.29.3).
+# 버전 없이 받으면 최신 메이저가 설치되는데, 최신 pnpm 은 승인 안 된 빌드 스크립트(esbuild)를
+# 경고가 아니라 에러(ERR_PNPM_IGNORED_BUILDS)로 처리해 빌드가 멈춘다.
+RUN npm install -g pnpm@10.29.3
 
-# 의존성 설치
+# 의존성 설치 (lockfile 그대로: 로컬·CI 와 같은 버전)
 COPY pnpm-lock.yaml ./
 COPY package.json ./
-RUN pnpm install
+RUN pnpm install --frozen-lockfile
 
 # 소스 복사 및 빌드
 COPY . .
@@ -18,6 +20,8 @@ RUN pnpm run build
 FROM nginx:stable-alpine
 # 빌드된 정적 파일들을 Nginx로 복사
 COPY --from=build /app/dist /usr/share/nginx/html
+# SPA 라우팅(새로고침 시 index.html)과 캐시 정책
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Nginx 기본 포트 개방
 EXPOSE 80

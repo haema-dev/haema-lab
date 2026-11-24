@@ -6,6 +6,7 @@ import TerminalFrame from './ui/TerminalFrame';
 import BootSequence from './features/BootSequence';
 import TerminalLogin from './features/TerminalLogin';
 import TerminalScanner from './pages/TerminalScanner';
+import TerminalQuery from './pages/TerminalQuery';
 import { MainLayout } from './layouts/MainLayout';
 
 export default function App() {
@@ -34,7 +35,8 @@ export default function App() {
     <BrowserRouter>
       <MainLayout>
         <Routes>
-          <Route path="/" element={<Navigate to="/scanner" replace />} />
+          <Route path="/" element={<Navigate to="/query" replace />} />
+          <Route path="/query" element={<TerminalQuery />} />
           <Route path="/scanner" element={<TerminalScanner />} />
           <Route path="/map" element={<div className="placeholder-screen cyan">GPS_MODULE_OFFLINE... AWAITING SATELLITE LINK</div>} />
           <Route path="/logs" element={<div className="placeholder-screen amber">ACCESSING_LOCAL_DATABASE...</div>} />

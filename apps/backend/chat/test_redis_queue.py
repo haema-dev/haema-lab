@@ -58,12 +58,6 @@ class StreamQueueTests(SimpleTestCase):
         with self.assertRaises(redis.ResponseError):
             q.ensure_group()
 
-    def test_legacy_list_items_move_to_stream_oldest_first(self):
-        self.r.rpop.side_effect = ["1", "2", None]  # LPUSH 로 쌓였으니 RPOP 이 오래된 것부터
-        self.assertEqual(q.migrate_legacy_list(), 2)
-        self.assertEqual([c.args[1] for c in self.r.xadd.call_args_list], [{"message_id": "1"}, {"message_id": "2"}])
-        self.r.rpop.assert_called_with(q.LEGACY_LIST_KEY)
-
     def test_heartbeat_resets_idle_without_changing_owner(self):
         q.heartbeat("pod-a", Job("1700-0", 42))
         self.r.xclaim.assert_called_once_with(

@@ -101,7 +101,15 @@ class WorkerDbErrorTests(SimpleTestCase):
             cmd._stop = True
             return None
 
-        with patch(f"{WORKER}.requeue_stale", side_effect=[DB_DOWN, 0]) as requeue,                 patch(f"{WORKER}.FastAPIClient"), patch(f"{WORKER}.ensure_group"),                 patch(f"{WORKER}.migrate_legacy_list", return_value=0),                 patch(f"{WORKER}.pending_message_ids", return_value=set()),                 patch(f"{WORKER}.cleanup_consumers", return_value=0),                 patch(f"{WORKER}.claim_stale", return_value=[]),                 patch(f"{WORKER}.dequeue_job", side_effect=stop_after_first_poll):
+        with (
+            patch(f"{WORKER}.requeue_stale", side_effect=[DB_DOWN, 0]) as requeue,
+            patch(f"{WORKER}.FastAPIClient"),
+            patch(f"{WORKER}.ensure_group"),
+            patch(f"{WORKER}.pending_message_ids", return_value=set()),
+            patch(f"{WORKER}.cleanup_consumers", return_value=0),
+            patch(f"{WORKER}.claim_stale", return_value=[]),
+            patch(f"{WORKER}.dequeue_job", side_effect=stop_after_first_poll),
+        ):
             cmd.handle(once=False)
         self.assertEqual(requeue.call_count, 2)
         self.sleep.assert_called_once_with(2)
@@ -120,13 +128,15 @@ class StreamWorkerTests(SimpleTestCase):
         self.patches["requeue_stale"].return_value = 0
         self.patches["pending_message_ids"].return_value = {99}
         self.patches["cleanup_consumers"].return_value = 0
-        migrate = patch(f"{WORKER}.migrate_legacy_list", return_value=0)
-        self.migrate = migrate.start()
-        self.addCleanup(migrate.stop)
 
     def run_once(self, *, new=(), reclaimed=(), process=None):
         feed = list(new) + [None]
-        with patch(f"{WORKER}.claim_stale", return_value=list(reclaimed)) as claim,                 patch(f"{WORKER}.dequeue_job", side_effect=feed),                 patch(f"{WORKER}.reset_reclaimed") as reset,                 patch(f"{WORKER}.process_message", side_effect=process or (lambda mid, client: "done")) as proc:
+        with (
+            patch(f"{WORKER}.claim_stale", return_value=list(reclaimed)) as claim,
+            patch(f"{WORKER}.dequeue_job", side_effect=feed),
+            patch(f"{WORKER}.reset_reclaimed") as reset,
+            patch(f"{WORKER}.process_message", side_effect=process or (lambda mid, client: "done")) as proc,
+        ):
             Command().handle(once=True)
         return claim, reset, proc
 
@@ -145,12 +155,6 @@ class StreamWorkerTests(SimpleTestCase):
         reset.assert_called_once_with(42)
         proc.assert_called_once()
         self.patches["ack"].assert_called_once_with(job)
-
-    def test_legacy_list_items_are_moved_at_startup(self):
-        self.migrate.return_value = 3
-        with self.assertLogs(WORKER, level="WARNING") as logs:
-            self.run_once()
-        self.assertTrue(any("moved 3 jobs" in line for line in logs.output))
 
     def test_ack_failure_does_not_crash_worker(self):
         import redis
@@ -202,7 +206,13 @@ class HeartbeatAndRecoveryTests(SimpleTestCase):
             real_time.sleep(0.08)
             return "done"
 
-        with patch(f"{WORKER}.HEARTBEAT_SECONDS", 0.01), patch(f"{WORKER}.heartbeat") as beat,                 patch(f"{WORKER}.process_message", side_effect=slow), patch(f"{WORKER}.ack"),                 patch(f"{WORKER}.refresh_db_connections"):
+        with (
+            patch(f"{WORKER}.HEARTBEAT_SECONDS", 0.01),
+            patch(f"{WORKER}.heartbeat") as beat,
+            patch(f"{WORKER}.process_message", side_effect=slow),
+            patch(f"{WORKER}.ack"),
+            patch(f"{WORKER}.refresh_db_connections"),
+        ):
             cmd = Command()
             cmd._stop, cmd._db_delays, cmd._consumer = False, (2,), "pod-a"
             cmd._handle_job(Job("3-0", 3), client=MagicMock(), once=False)
@@ -210,7 +220,13 @@ class HeartbeatAndRecoveryTests(SimpleTestCase):
         beat.assert_called_with("pod-a", Job("3-0", 3))
 
     def test_heartbeat_stops_after_the_job(self):
-        with patch(f"{WORKER}.HEARTBEAT_SECONDS", 0.01), patch(f"{WORKER}.heartbeat") as beat,                 patch(f"{WORKER}.process_message", return_value="done"), patch(f"{WORKER}.ack"),                 patch(f"{WORKER}.refresh_db_connections"):
+        with (
+            patch(f"{WORKER}.HEARTBEAT_SECONDS", 0.01),
+            patch(f"{WORKER}.heartbeat") as beat,
+            patch(f"{WORKER}.process_message", return_value="done"),
+            patch(f"{WORKER}.ack"),
+            patch(f"{WORKER}.refresh_db_connections"),
+        ):
             cmd = Command()
             cmd._stop, cmd._db_delays, cmd._consumer = False, (2,), "pod-a"
             cmd._handle_job(Job("4-0", 4), client=MagicMock(), once=False)
@@ -233,7 +249,16 @@ class HeartbeatAndRecoveryTests(SimpleTestCase):
         def stop(consumer, timeout_seconds):
             cmd._stop = True
 
-        with patch(f"{WORKER}.FastAPIClient"), patch(f"{WORKER}.ensure_group"),                 patch(f"{WORKER}.migrate_legacy_list", return_value=0),                 patch(f"{WORKER}.pending_message_ids", return_value=set()),                 patch(f"{WORKER}.requeue_stale", return_value=0),                 patch(f"{WORKER}.consumer_name", return_value="pod-a"),                 patch(f"{WORKER}.cleanup_consumers", return_value=2) as cleanup,                 patch(f"{WORKER}.claim_stale", return_value=[]) as claim,                 patch(f"{WORKER}.dequeue_job", side_effect=stop):
+        with (
+            patch(f"{WORKER}.FastAPIClient"),
+            patch(f"{WORKER}.ensure_group"),
+            patch(f"{WORKER}.pending_message_ids", return_value=set()),
+            patch(f"{WORKER}.requeue_stale", return_value=0),
+            patch(f"{WORKER}.consumer_name", return_value="pod-a"),
+            patch(f"{WORKER}.cleanup_consumers", return_value=2) as cleanup,
+            patch(f"{WORKER}.claim_stale", return_value=[]) as claim,
+            patch(f"{WORKER}.dequeue_job", side_effect=stop),
+        ):
             cmd.handle(once=False)
         claim.assert_called_once_with("pod-a", 90)
         cleanup.assert_called_once_with("pod-a", run_worker.CONSUMER_IDLE_CLEANUP_SECONDS)
