@@ -15,7 +15,7 @@
 ```
 1. 브라우저 → Cloudflare Tunnel → Gateway
 2. Gateway ─ 페이지 요청 → Frontend (정적 파일)
-           └ /api/**    → Django API   (기본 꺼짐. 로그인이 아직 없어 Gateway 가 X-User-Id 를 넣는다)
+           └ /api/**    → Django API   (GATEWAY_BACKENDAPI_ENABLED=true 로 켬. 로그인이 아직 없어 Gateway 가 X-User-Id: 1 을 넣는다)
 3. Django API: 입력 검증(300자 이하, 본문 2,048바이트 이하), 유저당 처리 중 질문 상한(3개 초과 → 429 Retry-After 30)
    ├ 대화·메시지 조회 ─────→ DB, 바로 응답
    └ 새 질문 → 메시지 저장(pending) → Redis Stream chat:jobs:stream 에 XADD → 202   ← 큐에 넣는 곳은 여기 하나
@@ -32,7 +32,7 @@
    인프라 실패(5xx, 타임아웃, ErrorDeviceLost) → pending 으로 되돌려 재시도, 유저 실패로 세지 않음
    처리 중에는 15초마다 하트비트 → 오래 걸리는 job 도 다른 워커가 가져가지 않음
    처리 중 워커가 죽으면 하트비트가 끊기고 → 90초 뒤 살아 있는(또는 재시작된) 워커가 XAUTOCLAIM 으로 이어받음
-5. 클라이언트가 GET /api/chat/messages/<id> 로 폴링   (프론트엔드는 아직 API 에 연결되지 않음)
+5. 프론트엔드 RAG_QUERY 화면이 GET /api/chat/messages/<id> 를 2초마다 폴링 → done / rejected / failed 표시
 
 계획: ⑥ 뒤에 FastAPI /judge (Gemini) 판정, 실패 시 /fallback. 폴링 대신 SSE.
 ```
@@ -148,8 +148,27 @@
 | 근거 청크가 바뀌면 그 청크를 인용한 캐시 삭제 | 있음 | 배포됨 | 재색인은 실측 안 함 (mock + CI DB 테스트) |
 | 인덱스 4개 (메시지 목록, 유저별 처리 중, 캐시 질문, 캐시 인용) | `table.sql` 에 있음 | DB 에 적용됨 | 운영 DB 에 직접 생성, `indisvalid = true` 확인 |
 | 테스트·평가 결과 기록 (`eval_run`, `eval_result`, `record_eval`) | 있음 | 테이블 생성됨, 명령 배포됨 | 제약 8개·인덱스 확인, 잘못된 환경값(`prod`) 거절 확인. 아직 기록 0건 |
+<<<<<<< Updated upstream
 | ai 응답에 토큰 수·시간 지표 (`metrics`) | 있음 | **없음** | ai 테스트 (필드 추가라 기존 backend 와 호환) |
 | Discord 알림 (job 결과 수치, 에러) | 있음 | **없음** | mock 테스트. GitHub Secret `DISCORD_WEBHOOK_URL` 주입 필요 |
+=======
+<<<<<<< Updated upstream
+| ai 응답에 토큰 수·시간 지표 (`metrics`) | 있음 | 배포됨 | ai 테스트. 서버 응답 값은 외부에서 볼 수 없어 Discord 알림으로 확인 |
+| Discord 알림 (job 결과 수치, 에러) | 있음 | **동작** | 서버 사이클 job 13~16 의 결과 알림이 채널에 도착 (2026-11-24, 사용자 확인). 에러 알림은 실제 장애로는 확인 안 함 |
+=======
+<<<<<<< Updated upstream
+| ai 응답에 토큰 수·시간 지표 (`metrics`) | 있음 | **없음** | ai 테스트 (필드 추가라 기존 backend 와 호환) |
+| Discord 알림 (job 결과 수치, 에러) | 있음 | **없음** | mock 테스트. GitHub Secret `DISCORD_WEBHOOK_URL` 주입 필요 |
+=======
+| ai 응답에 토큰 수·시간 지표 (`metrics`) | 있음 | 배포됨 | ai 테스트. 서버 응답 값은 외부에서 볼 수 없어 Discord 알림으로 확인 |
+| Discord 알림 (job 결과 수치, 에러) | 있음 | **동작** | 서버 사이클 job 13~16 의 결과 알림이 채널에 도착 (2026-11-24, 사용자 확인). 에러 알림은 실제 장애로는 확인 안 함 |
+| 인증 없는 테스트 API (`/api/chat/test`, `public.test` CRUD) | **삭제** | 있음 (배포 전) | Gateway `/api` 를 열기 전에 반드시 배포해야 함 |
+| 응답의 실패 사유 코드 (`reason`) | 있음 | 없음 | mock 테스트 2개. 내부 메시지·주소는 내보내지 않음 |
+| Gateway `/api/**` → Django 라우트 | 켬 (`manifests/gateway`) | 꺼짐 | 테스트 API 삭제가 배포된 뒤에 켜야 함 (아래 배포 순서) |
+| 프론트엔드 RAG_QUERY 화면 (질문 → 폴링 → 상태·출처·검증·인용·시간 표시) | 있음 | 없음 | 로컬 개발 서버 → 쿠버 백엔드로 실제 질문 1건: `DONE · GENERATED · VERIFIED · 13.1초` (2026-11-25) |
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
 
 "없음"은 로컬 코드를 머지하고 배포하면 서버에도 생깁니다.
 
@@ -158,9 +177,10 @@
 | 앱 | 범위 | 결과 |
 | :-- | :-- | :-- |
 | ai (pytest) | 게이트웨이 계약, 에러 코드·상태코드 분류, 요청·결과 로그, 연결 타임아웃, 토큰·시간 지표 | 26개 통과 |
-| backend (Django, DB 없이) | 코드 검증(`core`), FastAPI 클라이언트·지표, 미들웨어, Streams 큐, 워커 ack·회수·하트비트, 캐시 무효화, 평가 결과 입력 검증, Discord 알림 | 89개 통과 |
+| backend (Django, DB 없이) | 코드 검증(`core`), FastAPI 클라이언트·지표, 미들웨어, Streams 큐, 워커 ack·회수·하트비트, 캐시 무효화, 평가 결과 입력 검증, Discord 알림, API 응답 모양 | 89개 통과 |
 | backend (Django, DB 필요) | 파이프라인(단계별 시간·알림 포함), 워커, 색인, 캐시 미저장·무효화, 평가 결과 저장 | CI 에서만 실행. 로컬에서는 문법만 확인 |
 | gateway (Gradle) | 라우팅 (`/api` 기본 꺼짐) | 4개 통과 |
+| frontend | 타입 검사·빌드(`tsc -b && vite build`), lint | 통과 (단위 테스트 없음) |
 
 backend 의 DB 테스트는 CI 에서 실제 PostgreSQL + pgvector 컨테이너를 씁니다 (`chat_*` 테이블이 pgvector 타입이라 mock 불가). CI 는 PR 에서 바뀐 앱의 테스트만 돌리고, 필수 체크는 `test-result` 하나입니다.
 

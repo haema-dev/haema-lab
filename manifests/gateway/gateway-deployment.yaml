@@ -18,6 +18,12 @@ spec:
         image: ghcr.io/haema-dev/cloud-gateway:c8f217f4f4986a9d5742f4b0991e61f5779a5c9b
         ports:
         - containerPort: 8080
+        env:
+        # /api/** -> Django 라우트 (RouteConfig.kt, 기본 꺼짐). 켜면 Cloudflare Tunnel 로 인터넷에 열린다.
+        # 로그인이 아직 없어 모든 요청이 테스트 유저 1 로 들어간다(유저당 처리 중 상한 3개를 모든 방문자가 함께 씀).
+        # 켜기 전 조건: 인증 없는 테스트 API(/api/chat/test) 를 지운 backend 이미지가 먼저 배포돼 있어야 한다.
+        - name: GATEWAY_BACKENDAPI_ENABLED
+          value: "true"
         resources:
           limits:
             cpu: "500m"
