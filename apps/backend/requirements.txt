@@ -10,7 +10,7 @@ django-environ>=0.11
 psycopg[binary]>=3.2
 # `from pgvector.django import VectorField`
 pgvector>=0.4
-# Job queue (LPUSH/BRPOP) and GPU semaphore
+# Job queue (Redis Streams + consumer group) and GPU semaphore
 redis>=5
 # FastAPI model gateway client
 httpx>=0.28
