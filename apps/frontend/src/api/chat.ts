@@ -5,7 +5,8 @@
 // 로그인이 아직 없어 X-User-Id 는 Gateway 가 넣는다(클라이언트가 보내도 덮어씀).
 // 로컬 개발(pnpm dev)은 vite.config.ts 의 프록시가 /api 를 백엔드로 넘긴다.
 
-export const API_BASE: string = import.meta.env.VITE_API_BASE ?? '/api/chat';
+// import.meta.env 는 Vite 가 채운다. Vite 밖(테스트 스크립트 등)에서는 없으므로 ?. 로 읽는다.
+export const API_BASE: string = import.meta.env?.VITE_API_BASE ?? '/api/chat';
 export const MAX_QUESTION_CHARS = 300; // backend settings.MAX_QUESTION_CHARS
 
 export type MessageStatus = 'pending' | 'processing' | 'done' | 'failed' | 'rejected';
@@ -63,6 +64,8 @@ export class ApiError extends Error {
 
 type FetchLike = typeof fetch;
 
+export const NOT_API_MESSAGE = 'API 대신 다른 응답(HTML 등)이 왔습니다. Gateway 의 /api 라우트가 꺼져 있을 수 있습니다.';
+
 async function request<T>(path: string, init: RequestInit = {}, fetchImpl: FetchLike = fetch): Promise<T> {
   let response: Response;
   try {
@@ -75,11 +78,19 @@ async function request<T>(path: string, init: RequestInit = {}, fetchImpl: Fetch
   }
   if (response.status === 204) return undefined as T;
 
+  // JSON 이 아닌 응답(HTML 등)은 본문을 읽지 않는다: Gateway 의 /api 라우트가 꺼져 프론트 index.html 이 온 경우.
+  const isJson = (response.headers.get('Content-Type') ?? '').includes('application/json');
   let body: unknown = null;
-  try {
-    body = await response.json();
-  } catch {
-    // Gateway 404(라우트 꺼짐)나 프록시 HTML 응답
+  if (isJson) {
+    try {
+      body = await response.json();
+    } catch {
+      body = null;
+    }
+  }
+  if (response.ok && body === null) {
+    // 2xx 인데 API 응답이 아니다. 성공으로 넘기면 화면이 빈 값으로 깨지므로 에러로 바꾼다(재시도해도 같으니 5xx 가 아님).
+    throw new ApiError(response.status, NOT_API_MESSAGE);
   }
   if (!response.ok) {
     const serverMessage =
