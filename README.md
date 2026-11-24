@@ -223,6 +223,8 @@ python manage.py record_eval --json cycle.json
 - **계획 중인 알림**: 처리 불가 job, 검증 실패 급증, 큐 포화, Gemini 예산 초과.
 - **일일 리포트 (계획)**: SQL 로 지표를 집계하고 Gemini 가 리뷰를 쓰며, 리뷰의 모든 수치는 게시 전에 집계값과 대조합니다.
 
+![Discord Webhook](./discore_webhook.png)
+
 ## 🤖 AI 활용 개발
 
 코드는 AI 코딩 도구로 작성하고 측정으로 검증합니다. 결정은 제약 → 선택지 → 측정 → 결정 순서로 기록합니다.
