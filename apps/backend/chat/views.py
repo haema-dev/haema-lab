@@ -9,7 +9,7 @@ import logging
 
 import redis
 from django.conf import settings
-from django.db import IntegrityError, connection, transaction
+from django.db import IntegrityError, transaction
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -81,6 +81,9 @@ def _message_dict(m: Message) -> dict:
         "source": m.source,
         "cited_chunk_ids": m.cited_chunk_ids or [],
         "verification": m.verification,
+        # 실패·거절 사유 코드만 내보낸다(예: no_evidence, verification_failed, infra.ollama_unreachable).
+        # error 의 ':' 뒤(내부 메시지, 주소 등)는 내보내지 않는다.
+        "reason": (m.error or "").split(":", 1)[0] or None,
         "created_at": m.created_at,
         "updated_at": m.updated_at,
     }
@@ -235,51 +238,3 @@ def message_detail(request: HttpRequest, message_id: int) -> HttpResponse:
         message.delete()
         return HttpResponse(status=204)
     return JsonResponse(_message_dict(message))
-
-
-# --- 테스트 api (임시) ---------------------------------------------------------
-# public.test(qqq varchar) CRUD 확인용. 인증이 없는 엔드포인트다.
-# 확인이 끝나면 이 view 와 chat/urls.py 의 path("test", views.db_test) 를 반드시 제거한다.
-
-@csrf_exempt
-@require_http_methods(["GET", "POST", "PATCH", "DELETE"])
-def db_test(request: HttpRequest) -> JsonResponse:
-    """PK가 없어 수정·삭제는 값(qqq)으로 찾는다.
-
-    GET                              -> 전체 조회
-    POST   {"qqq": "a"}              -> 추가
-    PATCH  {"old": "a", "new": "b"}  -> old와 같은 행을 모두 new로 수정
-    DELETE {"qqq": "a"}              -> 같은 값의 행을 모두 삭제
-    """
-    if request.method == "GET":
-        with connection.cursor() as cur:
-            cur.execute("SELECT qqq FROM public.test")
-            return JsonResponse({"rows": [r[0] for r in cur.fetchall()]})
-
-    data, error = _body(request)
-    if error is not None:
-        return error
-
-    if request.method == "POST":
-        qqq = _clean_text(data.get("qqq"), 100)
-        if not qqq:
-            return _err("qqq 문자열(1~100자)이 필요합니다.", 400)
-        with connection.cursor() as cur:
-            cur.execute("INSERT INTO public.test (qqq) VALUES (%s)", [qqq])
-        return JsonResponse({"created": qqq}, status=201)
-
-    if request.method == "PATCH":
-        old = _clean_text(data.get("old"), 100)
-        new = _clean_text(data.get("new"), 100)
-        if not old or not new:
-            return _err("old, new 문자열(1~100자)이 필요합니다.", 400)
-        with connection.cursor() as cur:
-            cur.execute("UPDATE public.test SET qqq = %s WHERE qqq = %s", [new, old])
-            return JsonResponse({"updated": cur.rowcount})
-
-    qqq = _clean_text(data.get("qqq"), 100)  # DELETE
-    if not qqq:
-        return _err("qqq 문자열(1~100자)이 필요합니다.", 400)
-    with connection.cursor() as cur:
-        cur.execute("DELETE FROM public.test WHERE qqq = %s", [qqq])
-        return JsonResponse({"deleted": cur.rowcount})
