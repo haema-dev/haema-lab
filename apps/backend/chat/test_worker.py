@@ -10,7 +10,8 @@ from django.utils import timezone
 
 from chat._testing import ChatTestCase, FakeClient, no_gpu_slot, unit_vec
 from chat.management.commands.run_worker import requeue_stale
-from chat.models import Message, SourceChunk
+from chat.models import AnswerCache, Message, SourceChunk
+from chat.redis_queue import Job
 
 WORKER = "chat.management.commands.run_worker"
 
@@ -24,15 +25,18 @@ class WorkerTests(ChatTestCase):
             self.addCleanup(patcher.stop)
 
     def run_worker(self, ids, client):
-        feed = list(ids) + [None]
-        with patch(f"{WORKER}.dequeue_message", side_effect=feed), patch(f"{WORKER}.FastAPIClient", return_value=client):
+        """Redis 없이: 큐에서 ids 가 차례로 나오고 끝나는 것처럼 흉내 낸다. ack 된 message_id 목록을 돌려준다."""
+        feed = [Job(f"{i}-0", message_id) for i, message_id in enumerate(ids, 1)] + [None]
+        with patch(f"{WORKER}.dequeue_job", side_effect=feed), patch(f"{WORKER}.FastAPIClient", return_value=client),                 patch(f"{WORKER}.ensure_group"), patch(f"{WORKER}.migrate_legacy_list", return_value=0),                 patch(f"{WORKER}.claim_stale", return_value=[]), patch(f"{WORKER}.ack") as ack,                 patch(f"{WORKER}.pending_message_ids", return_value=set()),                 patch(f"{WORKER}.cleanup_consumers", return_value=0), patch(f"{WORKER}.heartbeat"):
             call_command("run_worker", "--once")
+        return [c.args[0].message_id for c in ack.call_args_list]
 
     def test_worker_processes_queued_messages_to_done(self):
         chunk = self.make_chunk("2026-08-27 기준금리를 2.50%로 동결했다.", unit_vec(0))
         answer = f"2026년 8월 27일 기준금리는 2.50%로 동결됐다. [{chunk.id}]"
         first, second = self.make_message("질문 하나"), self.make_message("질문 둘")
-        self.run_worker([first.pk, second.pk], FakeClient(answer=answer))
+        acked = self.run_worker([first.pk, second.pk], FakeClient(answer=answer))
+        self.assertEqual(acked, [first.pk, second.pk])
         for message in (first, second):
             message.refresh_from_db()
             self.assertEqual((message.status, message.answer), (Message.Status.DONE, answer))
@@ -87,3 +91,12 @@ class LoadChunksTests(ChatTestCase):
         self.assertEqual(SourceChunk.objects.count(), 2)
         self.load(self.write([{**row, "content": "바뀐 본문"}]))
         self.assertEqual(SourceChunk.objects.get(chunk_index=0).content, "바뀐 본문")
+
+    def test_changed_chunk_invalidates_cached_answers_that_cite_it(self):
+        row = {"url": "https://example.test/b", "title": "B", "published_at": "2026-08-27", "chunk_index": 0, "content": "본문"}
+        self.load(self.write([row]))
+        chunk = SourceChunk.objects.get(document__url=row["url"])
+        other = AnswerCache.objects.create(question="다른", answer="x", cited_chunk_ids=[chunk.id + 1000], verification={})
+        AnswerCache.objects.create(question="인용", answer="y", cited_chunk_ids=[chunk.id], verification={})
+        self.load(self.write([{**row, "content": "바뀐 본문"}]))
+        self.assertEqual(list(AnswerCache.objects.values_list("pk", flat=True)), [other.pk])

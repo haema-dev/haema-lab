@@ -56,6 +56,14 @@ def find_similar_cache(vector: Sequence[float], min_similarity: float | None) ->
     return None
 
 
+def invalidate_cache_for_chunks(chunk_ids: Sequence[int]) -> int:
+    """이 청크들 중 하나라도 인용한 캐시 답변을 지운다(근거가 바뀌었으니 다시 생성해야 한다). 지운 수를 돌려준다."""
+    if not chunk_ids:
+        return 0
+    deleted, _ = AnswerCache.objects.filter(cited_chunk_ids__overlap=list(chunk_ids)).delete()
+    return deleted
+
+
 def fit_context(documents: Sequence[Document], budget: int | None = None) -> tuple[Document, ...]:
     """순위 순서로 문서를 통째로 담되 예산을 넘으면 멈춘다. 1위 문서만 예산보다 길 때 자른다."""
     budget = getattr(settings, "CONTEXT_MAX_CHARS", DEFAULT_CONTEXT_MAX_CHARS) if budget is None else budget

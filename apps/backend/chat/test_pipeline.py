@@ -42,6 +42,12 @@ class PipelineTests(ChatTestCase):
         self.assertEqual(cache.cited_chunk_ids, [self.chunk.id])
         self.assertIsNotNone(cache.question_embedding)
 
+    def test_refusal_without_citation_is_shown_but_not_cached(self):
+        # 근거에 답이 없을 때: 보여주되 캐시하지 않는다(근거를 추가한 뒤 다시 생성되도록).
+        status, message = self.run_message(FakeClient(answer="제공된 자료에서 확인할 수 없습니다."))
+        self.assertEqual((status, message.status), ("done", Message.Status.DONE))
+        self.assertEqual(AnswerCache.objects.count(), 0)
+
     def test_question_is_embedded_with_instruction_and_chunks_are_not_instructed(self):
         client = FakeClient(answer=self.good)
         self.run_message(client)
