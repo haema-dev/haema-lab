@@ -18,6 +18,8 @@ RUN pnpm run build
 FROM nginx:stable-alpine
 # 빌드된 정적 파일들을 Nginx로 복사
 COPY --from=build /app/dist /usr/share/nginx/html
+# SPA 라우팅(새로고침 시 index.html)과 캐시 정책
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Nginx 기본 포트 개방
 EXPOSE 80
