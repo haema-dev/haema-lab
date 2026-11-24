@@ -25,8 +25,6 @@ log = logging.getLogger(__name__)
 STREAM_KEY = "chat:jobs:stream"
 GROUP = "workers"
 FIELD = "message_id"
-# List(LPUSH/BRPOP) 시절의 큐. 키 타입이 달라 같은 이름을 쓸 수 없다. 남은 항목은 워커 시작 때 Streams 로 옮긴다.
-LEGACY_LIST_KEY = "chat:jobs"
 GPU_SLOT_KEY_PREFIX = "chat:gpu-slot:"
 
 # 내가 잡은 슬롯일 때만 지운다(TTL이 끝나 남이 잡은 슬롯을 지우지 않도록).
@@ -56,7 +54,7 @@ _client: redis.Redis | None = None
 def get_redis() -> redis.Redis:
     global _client
     if _client is None:
-        # socket_timeout은 BRPOP 대기보다 길어야 빈 큐가 에러로 읽히지 않는다.
+        # socket_timeout은 XREADGROUP BLOCK 대기(최대 5초)보다 길어야 빈 큐가 에러로 읽히지 않는다.
         _client = redis.Redis.from_url(
             settings.REDIS_URL, decode_responses=True, socket_timeout=30, socket_connect_timeout=5
         )
@@ -75,16 +73,6 @@ def ensure_group() -> None:
     except redis.ResponseError as exc:
         if "BUSYGROUP" not in str(exc):
             raise
-
-
-def migrate_legacy_list() -> int:
-    """List 큐에 남은 message_id 를 Streams 로 옮긴다. 옮긴 개수를 돌려준다. 없으면 0."""
-    client = get_redis()
-    moved = 0
-    while (item := client.rpop(LEGACY_LIST_KEY)) is not None:
-        client.xadd(STREAM_KEY, {FIELD: str(item)})
-        moved += 1
-    return moved
 
 
 def enqueue_message(message_id: int) -> None:

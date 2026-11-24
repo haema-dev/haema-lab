@@ -27,7 +27,16 @@ class WorkerTests(ChatTestCase):
     def run_worker(self, ids, client):
         """Redis 없이: 큐에서 ids 가 차례로 나오고 끝나는 것처럼 흉내 낸다. ack 된 message_id 목록을 돌려준다."""
         feed = [Job(f"{i}-0", message_id) for i, message_id in enumerate(ids, 1)] + [None]
-        with patch(f"{WORKER}.dequeue_job", side_effect=feed), patch(f"{WORKER}.FastAPIClient", return_value=client),                 patch(f"{WORKER}.ensure_group"), patch(f"{WORKER}.migrate_legacy_list", return_value=0),                 patch(f"{WORKER}.claim_stale", return_value=[]), patch(f"{WORKER}.ack") as ack,                 patch(f"{WORKER}.pending_message_ids", return_value=set()),                 patch(f"{WORKER}.cleanup_consumers", return_value=0), patch(f"{WORKER}.heartbeat"):
+        with (
+            patch(f"{WORKER}.dequeue_job", side_effect=feed),
+            patch(f"{WORKER}.FastAPIClient", return_value=client),
+            patch(f"{WORKER}.ensure_group"),
+            patch(f"{WORKER}.claim_stale", return_value=[]),
+            patch(f"{WORKER}.ack") as ack,
+            patch(f"{WORKER}.pending_message_ids", return_value=set()),
+            patch(f"{WORKER}.cleanup_consumers", return_value=0),
+            patch(f"{WORKER}.heartbeat"),
+        ):
             call_command("run_worker", "--once")
         return [c.args[0].message_id for c in ack.call_args_list]
 

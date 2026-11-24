@@ -6,7 +6,7 @@
 처리가 끝나야(done/rejected/failed/재시도로 다시 넣음) ack 한다. 처리하는 동안 HEARTBEAT_SECONDS 마다 하트비트로
 항목의 idle 시간을 0 으로 되돌린다. 워커가 죽으면 하트비트가 끊기고, CLAIM_IDLE_SECONDS 뒤 살아 있는(또는 재시작된)
 워커가 XAUTOCLAIM 으로 가져와 이어서 처리한다. job 이 아무리 길어도 살아 있는 한 회수되지 않는다(중복 처리 없음).
-시작할 때 List 시절 큐에 남은 항목을 Streams 로 옮기고, 큐 밖에서 processing 으로 남은 메시지(List 시절 등)도 되살린다.
+시작할 때 스트림 밖에서 오래 processing 으로 남은 메시지도 되살린다(안전장치).
 
 DB 연결 장애(OperationalError/InterfaceError: 서버 재시작, 연결 끊김)는 인프라 실패다.
 유저 실패로 닫지 않고(retry_count 도 올리지 않는다) 연결을 버린 뒤 기다렸다가 메시지를 다시 큐에 넣는다.
@@ -39,7 +39,6 @@ from chat.redis_queue import (
     enqueue_message,
     ensure_group,
     heartbeat,
-    migrate_legacy_list,
     pending_message_ids,
 )
 
@@ -134,9 +133,6 @@ class Command(BaseCommand):
         client = FastAPIClient()
         try:
             self._with_redis_retry(ensure_group, once=once)
-            moved = self._with_redis_retry(migrate_legacy_list, once=once)
-            if moved:
-                log.warning("moved %s jobs from the legacy list queue to the stream", moved)
             in_stream = self._with_redis_retry(pending_message_ids, once=once)
             stale = self._with_db_retry(
                 lambda: requeue_stale(stale_seconds, exclude=in_stream), once=once, what="requeue_stale"
@@ -149,9 +145,6 @@ class Command(BaseCommand):
                 try:
                     reclaimed = []
                     if time.monotonic() >= next_claim:
-                        # 배포 중에는 옛 API 파드가 아직 List 에 넣을 수 있다: 주기마다 옮긴다(비어 있으면 RPOP 한 번).
-                        if moved := migrate_legacy_list():
-                            log.warning("moved %s jobs from the legacy list queue to the stream", moved)
                         reclaimed = claim_stale(consumer, claim_idle)
                         if removed := cleanup_consumers(consumer, CONSUMER_IDLE_CLEANUP_SECONDS):
                             log.info("removed %s idle consumers", removed)
